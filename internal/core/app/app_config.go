@@ -13,6 +13,7 @@ type Option func(*Config)
 
 type Config struct {
 	PodmanSocket  string
+	PodmanVersion string
 	SystemctlPath string
 	QuadletDir    string
 	Port          uint16
@@ -30,6 +31,7 @@ func DefaultConfig() *Config {
 	c := new(Config)
 
 	c.PodmanSocket = e.PodmanSocket
+	c.PodmanVersion = e.PodmanVersion
 	c.SystemctlPath = e.SystemctlPath
 	c.QuadletDir = e.QuadletHome
 	c.Rootful = e.Rootful

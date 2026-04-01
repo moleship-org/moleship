@@ -12,11 +12,14 @@ import (
 )
 
 type NewAdapterParams struct {
+	Version    string
 	SocketPath string
 }
 
 type Adapter struct {
+	version    string
 	socketPath string
+	libpodUri  string
 	client     *http.Client
 }
 
@@ -33,12 +36,23 @@ func New(params *NewAdapterParams) *Adapter {
 
 	return &Adapter{
 		socketPath: params.SocketPath,
+		version:    params.Version,
+		libpodUri:  fmt.Sprintf("http://d/v%s/libpod", params.Version),
 		client:     &http.Client{Transport: transport, Timeout: 5 * time.Second},
 	}
 }
 
+func (a *Adapter) getEndpoint(params ...string) string {
+	uri := a.libpodUri
+	for _, param := range params {
+		uri = uri + "/" + param
+	}
+	fmt.Println(uri)
+	return uri
+}
+
 func (a *Adapter) Ping(ctx context.Context) error {
-	req, _ := http.NewRequestWithContext(ctx, "GET", "http://d/v5.0.0/libpod/_ping", nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", a.getEndpoint("_ping"), nil)
 	resp, err := a.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrConnectionRefused, err)
@@ -52,7 +66,7 @@ func (a *Adapter) Ping(ctx context.Context) error {
 }
 
 func (a *Adapter) ListContainers(ctx context.Context) ([]entities.ListContainer, error) {
-	req, _ := http.NewRequestWithContext(ctx, "GET", "http://d/v5.0.0/libpod/containers/json?all=true", nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", a.getEndpoint("containers", "json?all=true"), nil)
 
 	resp, err := a.client.Do(req)
 	if err != nil {
@@ -77,7 +91,7 @@ func (a *Adapter) ListContainers(ctx context.Context) ([]entities.ListContainer,
 }
 
 func (a *Adapter) GetVersion(ctx context.Context) (string, error) {
-	req, _ := http.NewRequestWithContext(ctx, "GET", "http://d/v5.0.0/libpod/version", nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", a.getEndpoint("version"), nil)
 
 	resp, err := a.client.Do(req)
 	if err != nil {

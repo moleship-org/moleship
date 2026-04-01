@@ -32,7 +32,9 @@ type Env struct {
 
 	QuadletHome string `env:"MOLESHIP_QUADLET_HOME"`
 
-	Rootful bool `env:"MOLESHIP_ROOTFUL_MODE"`
+	Rootful bool `env:"MOLESHIP_ROOTFUL_MODE,default=0"`
+
+	PodmanVersion string `env:"MOLESHIP_PODMAN_VERSION,default=5.0.0"`
 }
 
 func LoadFiles(filenames ...string) error {

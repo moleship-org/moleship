@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/moleship-org/moleship/internal/domain/model"
 	"github.com/moleship-org/moleship/internal/domain/port"
@@ -54,11 +53,9 @@ func (s *quadletService) List(ctx context.Context) ([]model.Quadlet, error) {
 		if f.IsDir() || !strings.HasSuffix(f.Name(), ".container") {
 			continue
 		}
-
 		name := strings.TrimSuffix(f.Name(), ".container")
 
 		status, _ := s.systemd.UnitStatus(ctx, name+".service")
-
 		q := model.Quadlet{
 			Name:   name,
 			Path:   filepath.Join(s.dir, f.Name()),
@@ -66,7 +63,6 @@ func (s *quadletService) List(ctx context.Context) ([]model.Quadlet, error) {
 		}
 
 		for _, c := range realContainers {
-			fmt.Println(c)
 			isMatch := false
 			for _, cName := range c.Names {
 				cleanName := strings.TrimPrefix(cName, "/")
@@ -77,24 +73,11 @@ func (s *quadletService) List(ctx context.Context) ([]model.Quadlet, error) {
 			}
 
 			if isMatch {
-				q.ContainerID = c.ID
-				q.Image = c.Image
-				q.CreatedAt = c.Created
-				q.StartedAt = time.Unix(c.StartedAt, 0)
-				q.Networks = c.Networks
-
-				if len(c.Ports) > 0 {
-					for _, p := range c.Ports {
-						pStr := fmt.Sprintf("%d:%d/%s", p.HostPort, p.ContainerPort, p.Protocol)
-						q.Ports = append(q.Ports, pStr)
-					}
-				}
-
+				q.Container = c
 				break
 			}
 		}
 
-		fmt.Println(q)
 		quadlets = append(quadlets, q)
 	}
 

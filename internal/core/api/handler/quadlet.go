@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -46,7 +45,6 @@ func (h *Quadlet) GetByName(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 
 	name := ctx.PathValue("name")
-	fmt.Println("Name", name)
 	if strings.TrimSpace(name) == "" {
 		ctx.Error(http.StatusBadRequest, "Empty quadlet name")
 		return

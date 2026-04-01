@@ -79,6 +79,9 @@ func (a Application) Addr() string {
 }
 
 func (a *Application) Logger() *slog.Logger {
+	if a.cfg.Logger == nil {
+		a.cfg.Logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	}
 	return a.cfg.Logger
 }
 
@@ -90,6 +93,7 @@ func (a *Application) Prepare() {
 
 	podmanAdapter := podman.New(&podman.NewAdapterParams{
 		SocketPath: a.cfg.PodmanSocket,
+		Version:    a.cfg.PodmanVersion,
 	})
 
 	quadletSvc := service.NewQuadletService(&service.NewQuadletServiceParams{

@@ -13,15 +13,18 @@ var cmd = &cobra.Command{
 	Short: "serve starts a new moleship application server",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := make([]app.Option, 0)
+		a := app.New(opts...)
 
-		env.MustLoad()
 		fEnvFile, err := cmd.Flags().GetString("env-file")
 		if err != nil {
 			return err
 		}
+
+		a.Logger().Info("Loading env file", "file", fEnvFile)
 		if err := env.LoadFiles(fEnvFile); err != nil {
 			return err
 		}
+		env.MustLoad()
 
 		fPort, err := cmd.Flags().GetUint16("port")
 		if err != nil {
@@ -31,7 +34,7 @@ var cmd = &cobra.Command{
 			opts = append(opts, app.WithPort(fPort))
 		}
 
-		app.New(opts...).Start(context.Background())
+		a.Start(context.Background())
 		return nil
 	},
 }
