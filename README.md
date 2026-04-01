@@ -1,6 +1,6 @@
 # Moleship
 
-Moleship is a tool for managing files Quadlet unit files with a cohesive API.
+Moleship is a tool for managing Quadlet unit files with a cohesive API.
 
 ## Requirements
 
