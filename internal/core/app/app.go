@@ -84,12 +84,12 @@ func (a *Application) Logger() *slog.Logger {
 
 func (a *Application) Prepare() {
 	systemdAdapter := systemd.New(&systemd.NewAdapterParams{
-		BindPath: os.Getenv("MOLESHIP_BIN_SYSTEMCTL_PATH"),
+		BindPath: a.cfg.SystemctlPath,
 		UserMode: !a.cfg.Rootful,
 	})
 
 	podmanAdapter := podman.New(&podman.NewAdapterParams{
-		SocketPath: os.Getenv("MOLESHIP_PODMAN_SOCKET"),
+		SocketPath: a.cfg.PodmanSocket,
 	})
 
 	quadletSvc := service.NewQuadletService(&service.NewQuadletServiceParams{

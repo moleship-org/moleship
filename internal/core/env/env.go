@@ -27,6 +27,12 @@ type Env struct {
 	ServerPort string `env:"MOLESHIP_SERVER_PORT,default=6000"`
 
 	PodmanSocket string `env:"MOLESHIP_PODMAN_SOCKET"`
+
+	SystemctlPath string `env:"MOLESHIP_BIN_SYSTEMCTL_PATH"`
+
+	QuadletHome string `env:"MOLESHIP_QUADLET_HOME"`
+
+	Rootful bool `env:"MOLESHIP_ROOTFUL_MODE"`
 }
 
 func LoadFiles(filenames ...string) error {
@@ -34,8 +40,8 @@ func LoadFiles(filenames ...string) error {
 }
 
 func Load() (*Env, error) {
-	vars := new(Env)
-	if err := env.Load(vars); err != nil {
+	e := new(Env)
+	if err := env.Load(e); err != nil {
 		return nil, ErrCouldNotLoadEnvs
 	}
 
@@ -44,24 +50,40 @@ func Load() (*Env, error) {
 		return nil, ErrMissingHome
 	}
 
-	if vars.ConfigHome == "" {
-		vars.ConfigHome = filepath.Join(home, ".config", "moleship")
+	if e.ConfigHome == "" {
+		e.ConfigHome = filepath.Join(home, ".config", "moleship")
 	}
-	if vars.CacheHome == "" {
-		vars.CacheHome = filepath.Join(home, ".cache", "moleship")
+	if e.CacheHome == "" {
+		e.CacheHome = filepath.Join(home, ".cache", "moleship")
 	}
-	if vars.DataHome == "" {
-		vars.DataHome = filepath.Join(home, ".local", "share", "moleship")
+	if e.DataHome == "" {
+		e.DataHome = filepath.Join(home, ".local", "share", "moleship")
+	}
+	if e.QuadletHome == "" {
+		e.QuadletHome = filepath.Join(home, ".config", "containers", "systemd")
 	}
 
-	dirs := []string{vars.ConfigHome, vars.CacheHome, vars.DataHome}
+	dirs := []string{e.ConfigHome, e.CacheHome, e.DataHome, e.QuadletHome}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			return nil, ErrCouldNotCreateDirectory
 		}
 	}
 
-	return vars, nil
+	if e.PodmanSocket == "" {
+		runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
+		if runtimeDir == "" {
+			e.PodmanSocket = fmt.Sprintf("/run/user/%d/podman/podman.sock", os.Getuid())
+		} else {
+			e.PodmanSocket = filepath.Join(runtimeDir, "podman", "podman.sock")
+		}
+	}
+
+	if e.SystemctlPath == "" {
+		e.SystemctlPath = "/usr/bin/systemctl"
+	}
+
+	return e, nil
 }
 
 func MustLoad() *Env {
