@@ -1,0 +1,22 @@
+# Environment
+!.env*.example
+*.env*
+
+# Air
+tmp/
+testdata/
+
+# Building
+build/
+bin/
+_output/
+
+# Git Worktrees
+worktrees/
+
+# Specifics
+.vscode
+.idea
+.DS_Store
+is_local
+.claude
