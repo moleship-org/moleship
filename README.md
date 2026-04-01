@@ -13,6 +13,10 @@ Core dependencies:
 * libassuan v3.0.2^
 * libgpg-error v1.51^
 
+### Debian/Ubuntu Install
+  
+    apt install -y podman podman-compose libgpgme-dev libassuan-dev libgpg-error-dev
+
 ## Building
 
 If you have `make` installed, run:
