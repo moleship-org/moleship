@@ -2,10 +2,10 @@ package serializer
 
 import "github.com/moleship-org/moleship/internal/domain/model"
 
-type ListQuadlet struct {
-	Data []model.QuadletEntity `json:"data"`
+type ListContainer struct {
+	Data []model.ContainerEntity `json:"data"`
 }
 
-type GetQuadlet struct {
-	Data *model.QuadletEntity `json:"data"`
+type GetContainer struct {
+	Data *model.ContainerEntity `json:"data"`
 }

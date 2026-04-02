@@ -37,7 +37,7 @@ func (h *Container) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := serializer.ListQuadlet{Data: quadlets}
+	res := serializer.ListContainer{Data: quadlets}
 	if err := ctx.JSON(http.StatusOK, res); err != nil {
 		ctx.Error(http.StatusInternalServerError, "Failed to encode response")
 	}
@@ -59,7 +59,7 @@ func (h *Container) GetByName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := serializer.GetQuadlet{Data: quadlet}
+	res := serializer.GetContainer{Data: quadlet}
 	if err := ctx.JSON(http.StatusOK, res); err != nil {
 		ctx.Error(http.StatusInternalServerError, "Failed to encode response")
 	}

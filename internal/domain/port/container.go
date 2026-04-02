@@ -8,13 +8,13 @@ import (
 
 type ContainerService interface {
 	// List returns all running quadlets available on the system or an error if they cannot be retrieved.
-	List(ctx context.Context, filters Filters) ([]model.QuadletEntity, error)
+	List(ctx context.Context, filters Filters) ([]model.ContainerEntity, error)
 
 	// GetByID returns the quadlet with the given id or ErrQuadletNotFound if it does not exist.
-	GetByID(ctx context.Context, id string) (*model.QuadletEntity, error)
+	GetByID(ctx context.Context, id string) (*model.ContainerEntity, error)
 
 	// GetByName returns the quadlet with the given name or ErrQuadletNotFound if it does not exist.
-	GetByName(ctx context.Context, name string) (*model.QuadletEntity, error)
+	GetByName(ctx context.Context, name string) (*model.ContainerEntity, error)
 
 	// Start activates or enables the quadlet identified by name
 	Start(ctx context.Context, name string) error

@@ -14,7 +14,6 @@ var cmd = &cobra.Command{
 	Use:   "serve",
 	Short: "serve starts a new moleship application server",
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		fEnvFile, err := cmd.Flags().GetString("env-file")
 		if err != nil {
 			return err

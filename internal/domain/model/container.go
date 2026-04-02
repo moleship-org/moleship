@@ -2,7 +2,7 @@ package model
 
 import "github.com/containers/podman/v5/pkg/domain/entities"
 
-type QuadletEntity struct {
+type ContainerEntity struct {
 	Name      string                 `json:"name"`
 	Path      string                 `json:"path"`
 	Status    string                 `json:"status"` // active, inactive, failed, etc.

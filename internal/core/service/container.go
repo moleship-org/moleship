@@ -31,7 +31,7 @@ func NewContainerService(params *NewContainerServiceParams) port.ContainerServic
 	}
 }
 
-func (s *containerServiceImpl) List(ctx context.Context, filters port.Filters) ([]model.QuadletEntity, error) {
+func (s *containerServiceImpl) List(ctx context.Context, filters port.Filters) ([]model.ContainerEntity, error) {
 	if filters == nil {
 		filters = make(port.Filters)
 	}
@@ -41,7 +41,7 @@ func (s *containerServiceImpl) List(ctx context.Context, filters port.Filters) (
 		return nil, fmt.Errorf("failed to read quadlet directory: %w", err)
 	}
 
-	quadlets := make([]model.QuadletEntity, 0)
+	quadlets := make([]model.ContainerEntity, 0)
 	for _, f := range files {
 		if f.IsDir() || !strings.HasSuffix(f.Name(), ".container") {
 			continue
@@ -49,13 +49,13 @@ func (s *containerServiceImpl) List(ctx context.Context, filters port.Filters) (
 		name := strings.TrimSuffix(f.Name(), ".container")
 
 		status, _ := s.systemd.UnitStatus(ctx, name+".service")
-		q := model.QuadletEntity{
+		q := model.ContainerEntity{
 			Name:   name,
 			Path:   filepath.Join(s.dir, f.Name()),
 			Status: status,
 		}
 
-		filters["name"] = []string{f.Name()}
+		filters["name"] = []string{name}
 		containers, err := s.podman.ListContainers(ctx, filters)
 		if err == nil {
 			if len(containers) >= 1 {
@@ -69,7 +69,7 @@ func (s *containerServiceImpl) List(ctx context.Context, filters port.Filters) (
 	return quadlets, nil
 }
 
-func (s *containerServiceImpl) GetByID(ctx context.Context, id string) (*model.QuadletEntity, error) {
+func (s *containerServiceImpl) GetByID(ctx context.Context, id string) (*model.ContainerEntity, error) {
 	filters := port.Filters{
 		"id": {id},
 	}
@@ -79,7 +79,7 @@ func (s *containerServiceImpl) GetByID(ctx context.Context, id string) (*model.Q
 		return nil, err
 	}
 
-	var q *model.QuadletEntity
+	var q *model.ContainerEntity
 	if len(quadlets) >= 1 {
 		q = &quadlets[0]
 	}
@@ -87,7 +87,7 @@ func (s *containerServiceImpl) GetByID(ctx context.Context, id string) (*model.Q
 	return q, nil
 }
 
-func (s *containerServiceImpl) GetByName(ctx context.Context, name string) (*model.QuadletEntity, error) {
+func (s *containerServiceImpl) GetByName(ctx context.Context, name string) (*model.ContainerEntity, error) {
 	fileName := name + ".container"
 	path := filepath.Join(s.dir, fileName)
 
@@ -96,7 +96,7 @@ func (s *containerServiceImpl) GetByName(ctx context.Context, name string) (*mod
 	}
 
 	status, _ := s.systemd.UnitStatus(ctx, name+".service")
-	q := &model.QuadletEntity{
+	q := &model.ContainerEntity{
 		Name:   name,
 		Path:   path,
 		Status: status,
