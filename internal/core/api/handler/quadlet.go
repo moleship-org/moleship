@@ -2,70 +2,62 @@ package handler
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
-	"github.com/moleship-org/moleship/internal/core/api/serializer"
 	"github.com/moleship-org/moleship/internal/domain/port"
 )
 
 type Quadlet struct {
-	service port.QuadletService
+	quadletSvc port.QuadletService
 }
 
 func NewQuadlet(s port.QuadletService) *Quadlet {
 	return &Quadlet{
-		service: s,
+		quadletSvc: s,
 	}
 }
 
-// List GET /api/quadlets
-func (h *Quadlet) List(w http.ResponseWriter, r *http.Request) {
+// --- Quadlet File Operations
+
+func (h *Quadlet) ListFiles(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
-
-	quadlets, err := h.service.List(r.Context())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if quadlets == nil {
-		ctx.Status(http.StatusNotFound)
-		return
-	}
-
-	res := serializer.ListQuadlet{Data: quadlets}
-	if err := ctx.JSON(http.StatusOK, res); err != nil {
-		ctx.Error(http.StatusInternalServerError, "Failed to encode response")
-	}
+	ctx.Status(http.StatusNotImplemented)
 }
 
-// GetByName GET /api/quadlets/{name}
-func (h *Quadlet) GetByName(w http.ResponseWriter, r *http.Request) {
+func (h *Quadlet) GetFileByName(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
+	ctx.Status(http.StatusNotImplemented)
+}
 
-	name := ctx.PathValue("name")
-	if strings.TrimSpace(name) == "" {
-		ctx.Error(http.StatusBadRequest, "Empty quadlet name")
-		return
-	}
+func (h *Quadlet) Create(w http.ResponseWriter, r *http.Request) {
+	ctx := apiutil.FromRequest(w, r)
+	ctx.Status(http.StatusNotImplemented)
+}
 
-	quadlet, err := h.service.GetByName(r.Context(), name)
-	if err != nil {
-		ctx.Status(http.StatusNotFound)
-		return
-	}
+func (h *Quadlet) Update(w http.ResponseWriter, r *http.Request) {
+	ctx := apiutil.FromRequest(w, r)
+	ctx.Status(http.StatusNotImplemented)
+}
 
-	res := serializer.GetQuadlet{Data: quadlet}
-	if err := ctx.JSON(http.StatusOK, res); err != nil {
-		ctx.Error(http.StatusInternalServerError, "Failed to encode response")
-	}
+func (h *Quadlet) ReplaceOrCreate(w http.ResponseWriter, r *http.Request) {
+	ctx := apiutil.FromRequest(w, r)
+	ctx.Status(http.StatusNotImplemented)
+}
+
+func (h *Quadlet) Delete(w http.ResponseWriter, r *http.Request) {
+	ctx := apiutil.FromRequest(w, r)
+	ctx.Status(http.StatusNotImplemented)
 }
 
 func (h *Quadlet) Mux(m *http.ServeMux) {
-	m.HandleFunc("GET /api/quadlets", h.List)
-	m.HandleFunc("GET /api/quadlets/{name}", h.GetByName)
-	// m.HandleFunc("/api/quadlets/start/", ht.Start)
-	// m.HandleFunc("/api/quadlets/stop/", ht.Stop)
-	// m.HandleFunc("/api/quadlets/restart/", ht.Restart)
+	// Get all quadlet files
+	m.HandleFunc("GET /api/quadlets", h.ListFiles)
+	// Get one quadlet file
+	m.HandleFunc("GET /api/quadlets/{name}", h.GetFileByName)
+
+	// Create, Update and Delete
+	m.HandleFunc("POST /api/quadlets", h.Create)
+	m.HandleFunc("PUT /api/quadlets/{name}", h.ReplaceOrCreate)
+	m.HandleFunc("PATCH /api/quadlets/{name}", h.Update)
+	m.HandleFunc("DELETE /api/quadlets/{name}", h.Delete)
 }

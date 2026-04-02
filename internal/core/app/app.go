@@ -96,13 +96,20 @@ func (a *Application) Prepare() {
 		Version:    a.cfg.PodmanVersion,
 	})
 
+	containerSvc := service.NewContainerService(&service.NewContainerServiceParams{
+		Systemd:    systemdAdapter,
+		Podman:     podmanAdapter,
+		QuadletDir: a.cfg.QuadletDir,
+	})
+
 	quadletSvc := service.NewQuadletService(&service.NewQuadletServiceParams{
 		Systemd:    systemdAdapter,
 		Podman:     podmanAdapter,
-		QuadletDir: os.Getenv("MOLESHIP_QUADLET_HOME"),
+		QuadletDir: a.cfg.QuadletDir,
 	})
 
 	handler.NewHealth().Mux(a.router)
+	handler.NewContainer(containerSvc).Mux(a.router)
 	handler.NewQuadlet(quadletSvc).Mux(a.router)
 
 	a.handler = middleware.Apply(a.router,

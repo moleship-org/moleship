@@ -7,19 +7,18 @@ import (
 )
 
 type QuadletService interface {
-	// List returns all quadlets available on the system or an error if they cannot be retrieved.
-	List(ctx context.Context) ([]model.Quadlet, error)
+	// List returns all quadlets files on the system.
+	List(ctx context.Context) ([]model.QuadletFile, error)
 
-	// GetByName returns the quadlet with the given name or ErrQuadletNotFound if it does not exist.
-	// The returned Quadlet may include the content field depending on implementation.
-	GetByName(ctx context.Context, name string) (model.Quadlet, error)
+	// Get returns a quadlet unit file information if it exists.
+	Get(ctx context.Context, name string) (*model.QuadletFile, error)
 
-	// Start activates or enables the quadlet identified by name. Returns an error if the operation fails.
-	Start(ctx context.Context, name string) error
+	// Create creates a new quadlet file with the given name and options.
+	Create(ctx context.Context, name string, qf *model.QuadletFile) error
 
-	// Stop deactivates or disables the quadlet identified by name. Returns an error if the operation fails.
-	Stop(ctx context.Context, name string) error
+	// Update updates a quadlet file options.
+	Update(ctx context.Context, override bool, name string, qf *model.QuadletFile) error
 
-	// Restart restarts the quadlet identified by name (stop then start). Returns an error if the operation fails.
-	Restart(ctx context.Context, name string) error
+	// Delete removes a quadlet file from the system.
+	Delete(ctx context.Context, name string) error
 }
