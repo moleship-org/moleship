@@ -24,4 +24,10 @@ type ContainerService interface {
 
 	// Restart restarts the quadlet identified by name (stop then start).
 	Restart(ctx context.Context, name string) error
+
+	// Exists checks if the container is exists on podman runtime.
+	Exists(ctx context.Context, name string) (bool, error)
+
+	// Stats returns a container's resource usage.
+	Stats(ctx context.Context, name string) (*model.ContainerStats, error)
 }

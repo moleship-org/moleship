@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,11 @@ import (
 
 	"github.com/moleship-org/moleship/internal/domain/model"
 	"github.com/moleship-org/moleship/internal/domain/port"
+)
+
+var (
+	ErrInvalidContainer   = errors.New("invalid container definition")
+	ErrContainertNotFound = errors.New("container not found")
 )
 
 type NewContainerServiceParams struct {
@@ -74,14 +80,14 @@ func (s *containerServiceImpl) GetByID(ctx context.Context, id string) (*model.C
 		"id": {id},
 	}
 
-	quadlets, err := s.List(ctx, filters)
+	containers, err := s.List(ctx, filters)
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidContainer
 	}
 
 	var q *model.ContainerEntity
-	if len(quadlets) >= 1 {
-		q = &quadlets[0]
+	if len(containers) >= 1 {
+		q = &containers[0]
 	}
 
 	return q, nil
@@ -92,7 +98,7 @@ func (s *containerServiceImpl) GetByName(ctx context.Context, name string) (*mod
 	path := filepath.Join(s.dir, fileName)
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, ErrQuadletNotFound
+		return nil, ErrContainertNotFound
 	}
 
 	status, _ := s.systemd.UnitStatus(ctx, name+".service")
@@ -127,4 +133,20 @@ func (s *containerServiceImpl) Restart(ctx context.Context, name string) error {
 		return err
 	}
 	return s.systemd.RestartUnit(ctx, name+".service")
+}
+
+func (s *containerServiceImpl) Exists(ctx context.Context, name string) (bool, error) {
+	ok, err := s.podman.Exists(ctx, name)
+	if errors.Is(err, ErrContainertNotFound) {
+		return false, nil
+	}
+	return ok, err
+}
+
+func (s *containerServiceImpl) Stats(ctx context.Context, name string) (*model.ContainerStats, error) {
+	report, err := s.podman.Stats(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return report, nil
 }

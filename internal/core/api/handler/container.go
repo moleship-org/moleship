@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -47,9 +48,19 @@ func (h *Container) List(w http.ResponseWriter, r *http.Request) {
 func (h *Container) GetByName(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 
-	name := chi.URLParam(r, "name")
+	name := ctx.PathValue("name")
 	if strings.TrimSpace(name) == "" {
 		ctx.Error(http.StatusBadRequest, "Empty container name")
+		return
+	}
+
+	ok, err := h.containerSvc.Exists(r.Context(), name)
+	if err != nil {
+		ctx.Error(http.StatusInternalServerError, "internal error on checking if container exists")
+		return
+	}
+	if !ok {
+		ctx.Status(http.StatusNotFound)
 		return
 	}
 
@@ -83,10 +94,34 @@ func (h *Container) Restart(w http.ResponseWriter, r *http.Request) {
 	ctx.Status(http.StatusNotImplemented)
 }
 
-// HEAD /api/v1/containers/{name}
-func (h *Container) Status(w http.ResponseWriter, r *http.Request) {
+// GET /api/v1/containers/{name}/stats
+func (h *Container) Stats(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
-	ctx.Status(http.StatusNotImplemented)
+
+	name := ctx.PathValue("name")
+	if strings.TrimSpace(name) == "" {
+		ctx.Error(http.StatusBadRequest, "Empty container name")
+		return
+	}
+
+	ok, err := h.containerSvc.Exists(r.Context(), name)
+	if err != nil {
+		ctx.Error(http.StatusInternalServerError, "internal error on checking if container exists")
+		return
+	}
+	if !ok {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
+
+	stats, err := h.containerSvc.Stats(r.Context(), name)
+	if err != nil {
+		fmt.Println(stats, err)
+		ctx.Error(http.StatusInternalServerError, "internal error trying to get resources of the container")
+		return
+	}
+
+	ctx.JSON(http.StatusOK, stats)
 }
 
 // GET /api/v1/containers/{name}/logs
@@ -105,7 +140,7 @@ func (h *Container) Mux(r chi.Router) {
 		r.Patch("/{name}/systemd/stop", h.Stop)
 		r.Patch("/{name}/systemd/restart", h.Restart)
 		// Status and logs
-		r.Head("/{name}", h.Status)
+		r.Get("/{name}/stats", h.Stats)
 		r.Get("/{name}/logs", h.Logs)
 	})
 }
