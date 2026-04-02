@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"codeberg.org/ungo/env"
-	"codeberg.org/ungo/env/dotenv"
 )
 
 var (
@@ -37,14 +36,14 @@ type Env struct {
 	PodmanVersion string `env:"MOLESHIP_PODMAN_VERSION,default=5.0.0"`
 }
 
-func LoadFiles(filenames ...string) error {
-	return dotenv.Load(filenames...)
-}
-
 func Load() (*Env, error) {
 	e := new(Env)
 	if err := env.Load(e); err != nil {
 		return nil, ErrCouldNotLoadEnvs
+	}
+
+	if e.Mode == "" {
+		e.Mode = "debug"
 	}
 
 	home, err := os.UserHomeDir()

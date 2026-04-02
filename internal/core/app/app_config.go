@@ -1,9 +1,9 @@
 package app
 
 import (
+	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/moleship-org/moleship/internal/core/env"
@@ -12,6 +12,7 @@ import (
 type Option func(*Config)
 
 type Config struct {
+	Mode          string
 	PodmanSocket  string
 	PodmanVersion string
 	SystemctlPath string
@@ -22,12 +23,7 @@ type Config struct {
 }
 
 func DefaultConfig() *Config {
-	e, err := env.Load()
-	if err != nil {
-		slog.Error("failed to load environment variables", "error", err)
-		os.Exit(1)
-	}
-
+	e := env.MustLoad()
 	c := new(Config)
 
 	c.PodmanSocket = e.PodmanSocket
@@ -35,6 +31,7 @@ func DefaultConfig() *Config {
 	c.SystemctlPath = e.SystemctlPath
 	c.QuadletDir = e.QuadletHome
 	c.Rootful = e.Rootful
+	c.Mode = e.Mode
 
 	configPort(c, e)
 	configLogger(c, e)
@@ -43,6 +40,7 @@ func DefaultConfig() *Config {
 }
 
 func configPort(c *Config, e *env.Env) {
+
 	port, err := strconv.ParseUint(e.ServerPort, 10, 16)
 	if err != nil {
 		slog.Error("failed to parse port to uin16", "error", err)
@@ -55,30 +53,24 @@ func configPort(c *Config, e *env.Env) {
 }
 
 func configLogger(c *Config, e *env.Env) {
+	var logger *slog.Logger
 	switch e.Mode {
-	case "debug-silent":
-		devNull, _ := os.OpenFile("/dev/null", os.O_WRONLY, 0)
-		c.Logger = slog.New(slog.NewTextHandler(devNull, nil))
-		c.Logger.Info("Using 'debug-silent' mode")
+	case "silent":
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	case "production":
-		debugPath := filepath.Join(e.DataHome, "journal.log")
-		flog, err := os.OpenFile(debugPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			slog.Error("failed to create debu file", "error", err)
-			os.Exit(1)
-		}
-
-		c.Logger = slog.New(slog.NewJSONHandler(flog, &slog.HandlerOptions{
-			Level: slog.LevelError,
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
 		}))
-		c.Logger.Info("Using 'production' mode")
 
-	case "", "debug":
+	case "debug":
+		fallthrough
 	default:
-		c.Logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
-		c.Logger.Info("Using 'debug' mode")
+		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
 	}
+	c.Logger = logger
 }
 
 func WithPort(port uint16) Option {

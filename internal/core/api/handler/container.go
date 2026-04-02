@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
 	"github.com/moleship-org/moleship/internal/core/api/serializer"
 	"github.com/moleship-org/moleship/internal/domain/port"
@@ -21,7 +22,7 @@ func NewContainer(s port.ContainerService) *Container {
 
 // --- Container Entity Operations
 
-// List GET /api/containers
+// List GET /api/v1/containers
 func (h *Container) List(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 
@@ -42,13 +43,13 @@ func (h *Container) List(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetByName GET /api/containers/{name}
+// GetByName GET /api/v1/containers/{name}
 func (h *Container) GetByName(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 
-	name := ctx.PathValue("name")
+	name := chi.URLParam(r, "name")
 	if strings.TrimSpace(name) == "" {
-		ctx.Error(http.StatusBadRequest, "Empty quadlet name")
+		ctx.Error(http.StatusBadRequest, "Empty container name")
 		return
 	}
 
@@ -64,48 +65,47 @@ func (h *Container) GetByName(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// PATCH /api/containers/{name}/systemd/start
+// PATCH /api/v1/containers/{name}/systemd/start
 func (h *Container) Start(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 	ctx.Status(http.StatusNotImplemented)
 }
 
-// PATCH /api/containers/{name}/systemd/stop
+// PATCH /api/v1/containers/{name}/systemd/stop
 func (h *Container) Stop(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 	ctx.Status(http.StatusNotImplemented)
 }
 
-// PATCH /api/containers/{name}/systemd/restart
+// PATCH /api/v1/containers/{name}/systemd/restart
 func (h *Container) Restart(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 	ctx.Status(http.StatusNotImplemented)
 }
 
-// HEAD /api/containers/{name}
+// HEAD /api/v1/containers/{name}
 func (h *Container) Status(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 	ctx.Status(http.StatusNotImplemented)
 }
 
-// GET /api/containers/{name}/logs
+// GET /api/v1/containers/{name}/logs
 func (h *Container) Logs(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 	ctx.Status(http.StatusNotImplemented)
 }
 
-func (h *Container) Mux(m *http.ServeMux) {
-	// Get all quadlet entities
-	m.HandleFunc("GET /api/containers", h.List)
-	// Get one quadlet entity
-	m.HandleFunc("GET /api/containers/{name}", h.GetByName)
-
-	// Systemd actions
-	m.HandleFunc("PATCH /api/containers/{name}/systemd/start", h.Start)
-	m.HandleFunc("PATCH /api/containers/{name}/systemd/stop", h.Stop)
-	m.HandleFunc("PATCH /api/containers/{name}/systemd/restart", h.Restart)
-
-	// Status and logs
-	m.HandleFunc("HEAD /api/containers/{name}", h.Status)
-	m.HandleFunc("GET /api/containers/{name}/logs", h.Logs)
+func (h *Container) Mux(r chi.Router) {
+	r.Route("/containers", func(r chi.Router) {
+		// Get containers
+		r.Get("/", h.List)
+		r.Get("/{name}", h.GetByName)
+		// Systemd actions
+		r.Patch("/{name}/systemd/start", h.Start)
+		r.Patch("/{name}/systemd/stop", h.Stop)
+		r.Patch("/{name}/systemd/restart", h.Restart)
+		// Status and logs
+		r.Head("/{name}", h.Status)
+		r.Get("/{name}/logs", h.Logs)
+	})
 }

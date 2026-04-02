@@ -12,7 +12,7 @@ func Logger(lg *slog.Logger) Middleware {
 			start := time.Now()
 			next.ServeHTTP(w, r)
 			if lg != nil {
-				lg.Info("", "method", r.Method, "path", r.URL.Path, "since", time.Since(start))
+				lg.Debug("Request", "method", r.Method, "path", r.URL.Path, "since", time.Since(start))
 			}
 		})
 	}

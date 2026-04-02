@@ -2,9 +2,11 @@ package serve
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"codeberg.org/ungo/env/dotenv"
 	"github.com/moleship-org/moleship/internal/core/app"
-	"github.com/moleship-org/moleship/internal/core/env"
 	"github.com/spf13/cobra"
 )
 
@@ -12,19 +14,16 @@ var cmd = &cobra.Command{
 	Use:   "serve",
 	Short: "serve starts a new moleship application server",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := make([]app.Option, 0)
-		a := app.New(opts...)
 
 		fEnvFile, err := cmd.Flags().GetString("env-file")
 		if err != nil {
 			return err
 		}
-
-		a.Logger().Info("Loading env file", "file", fEnvFile)
-		if err := env.LoadFiles(fEnvFile); err != nil {
+		if err := dotenv.Load(fEnvFile); err != nil {
 			return err
 		}
-		env.MustLoad()
+
+		opts := make([]app.Option, 0)
 
 		fPort, err := cmd.Flags().GetUint16("port")
 		if err != nil {
@@ -33,6 +32,10 @@ var cmd = &cobra.Command{
 		if fPort != 0 && fPort != 6000 {
 			opts = append(opts, app.WithPort(fPort))
 		}
+
+		a := app.New(opts...)
+		a.Logger().Info("Environment file loaded", "file", fEnvFile)
+		a.Logger().Info(fmt.Sprintf("Running on '%s' mode", strings.ToUpper(a.Config().Mode)))
 
 		a.Start(context.Background())
 		return nil

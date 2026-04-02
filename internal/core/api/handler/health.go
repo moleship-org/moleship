@@ -1,6 +1,10 @@
 package handler
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+)
 
 type Health struct {
 	allows string
@@ -27,6 +31,6 @@ func (ht *Health) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (ht *Health) Mux(m *http.ServeMux) {
-	m.Handle("/api/health", ht)
+func (ht *Health) Mux(r chi.Router) {
+	r.Handle("/health", ht)
 }
