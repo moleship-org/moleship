@@ -21,4 +21,7 @@ type QuadletService interface {
 
 	// Delete removes a quadlet file from the system.
 	Delete(ctx context.Context, name string) error
+
+	// Reload reloads the systemd daemons.
+	Reload(ctx context.Context) error
 }

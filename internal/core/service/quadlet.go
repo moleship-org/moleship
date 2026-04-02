@@ -52,3 +52,7 @@ func (s *quadletService) Update(ctx context.Context, override bool, name string,
 func (s *quadletService) Delete(ctx context.Context, name string) error {
 	return nil
 }
+
+func (s *quadletService) Reload(ctx context.Context) error {
+	return nil
+}
