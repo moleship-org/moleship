@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/form"
 )
 
@@ -149,7 +150,7 @@ func (c *contextImpl) Get(key any) any {
 }
 
 func (c *contextImpl) PathValue(key string) string {
-	return c.req.PathValue(key)
+	return chi.URLParam(c.req, key)
 }
 
 func (c *contextImpl) QueryParam(key string) string {
