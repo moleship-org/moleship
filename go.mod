@@ -5,6 +5,7 @@ go 1.26.1
 require (
 	codeberg.org/ungo/env v0.0.0-20260328142946-76f69daf34a3
 	github.com/containers/podman/v5 v5.8.1
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-playground/form v3.1.4+incompatible
 	github.com/spf13/cobra v1.10.2
 )
@@ -38,7 +39,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/go-chi/chi/v5 v5.2.5 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
