@@ -37,9 +37,9 @@ func NewContainerService(params *NewContainerServiceParams) port.ContainerServic
 	}
 }
 
-func (s *containerServiceImpl) List(ctx context.Context, filters port.Filters) ([]model.ContainerEntity, error) {
+func (s *containerServiceImpl) List(ctx context.Context, filters model.Filters) ([]model.ContainerEntity, error) {
 	if filters == nil {
-		filters = make(port.Filters)
+		filters = make(model.Filters)
 	}
 
 	files, err := os.ReadDir(s.dir)
@@ -76,7 +76,7 @@ func (s *containerServiceImpl) List(ctx context.Context, filters port.Filters) (
 }
 
 func (s *containerServiceImpl) GetByID(ctx context.Context, id string) (*model.ContainerEntity, error) {
-	filters := port.Filters{
+	filters := model.Filters{
 		"id": {id},
 	}
 
@@ -108,7 +108,7 @@ func (s *containerServiceImpl) GetByName(ctx context.Context, name string) (*mod
 		Status: status,
 	}
 
-	filters := port.Filters{
+	filters := model.Filters{
 		"name": {name},
 	}
 

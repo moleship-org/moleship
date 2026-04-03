@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/containers/podman/v5/pkg/domain/entities"
 	"github.com/moleship-org/moleship/internal/domain/model"
-	"github.com/moleship-org/moleship/internal/domain/port"
 )
 
 type NewAdapterParams struct {
@@ -49,73 +47,70 @@ func New(params *NewAdapterParams) *Adapter {
 func (a *Adapter) getEndpoint(params ...string) string {
 	uri := a.libpodUri
 	for _, param := range params {
-		uri = uri + "/" + param
+		if strings.HasPrefix(param, "?") {
+			uri += param
+			break
+		} else {
+			uri += "/" + param
+		}
 	}
 	return uri
 }
 
-func (a *Adapter) Ping(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", a.getEndpoint("_ping"), nil)
-	if err != nil {
-		return err
-	}
+func (a *Adapter) RawCall(ctx context.Context, method string, path ...string) (*http.Response, error) {
+	endpoint := a.getEndpoint(path...)
 
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrConnectionRefused, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w: unexpected status %s", ErrInvalidResponse, resp.Status)
-	}
-	return nil
-}
-
-func (a *Adapter) ListContainers(ctx context.Context, filters port.Filters) ([]entities.ListContainer, error) {
-	if filters == nil {
-		filters = make(port.Filters)
-	}
-
-	endpoint := a.getEndpoint("containers", "json")
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("%w: internal url parse error", err)
-	}
-
-	q := u.Query()
-	q.Set("all", "true")
-	if len(filters) > 0 {
-		for key, value := range filters {
-			q.Set(key, strings.Join(value, ","))
-		}
-	}
-	u.RawQuery = q.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := a.client.Do(req)
+	res, err := a.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionRefused, err)
+		return nil, ErrConnectionRefused
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: status %s", ErrInvalidResponse, resp.Status)
+	return res, nil
+}
+
+func (a *Adapter) Ping(ctx context.Context) (http.Header, error) {
+	res, err := a.RawCall(ctx, "GET", "_ping")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusInternalServerError {
+		return nil, fmt.Errorf("%w: unexpected status %s", ErrInvalidResponse, res.Status)
+	}
+
+	return res.Header, nil
+}
+
+func (a *Adapter) ListContainers(ctx context.Context, filters model.Filters) ([]entities.ListContainer, error) {
+	if filters == nil {
+		filters = make(model.Filters)
+	}
+
+	res, err := a.RawCall(ctx, "GET", "containers", "json", filters.Query())
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %s", ErrInvalidResponse, res.Status)
 	}
 
 	var containers []entities.ListContainer
-	if err := json.NewDecoder(resp.Body).Decode(&containers); err != nil {
+	if err := json.NewDecoder(res.Body).Decode(&containers); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
 	}
 
 	return containers, nil
 }
 
-func (a *Adapter) GetVersion(ctx context.Context) (*port.PodmanSystemVersion, error) {
+func (a *Adapter) GetVersion(ctx context.Context) (*model.PodmanSystemVersion, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", a.getEndpoint("version"), nil)
 	if err != nil {
 		return nil, err
@@ -136,7 +131,7 @@ func (a *Adapter) GetVersion(ctx context.Context) (*port.PodmanSystemVersion, er
 		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
 	}
 
-	res := &port.PodmanSystemVersion{Data: v}
+	res := &model.PodmanSystemVersion{Data: v}
 	return res, nil
 }
 
@@ -178,7 +173,6 @@ func (a *Adapter) Stats(ctx context.Context, name string) (*model.ContainerStats
 	}
 
 	var report model.ContainerStats
-	// Usamos Decoder porque es más eficiente para streams/chunked responses
 	if err := json.NewDecoder(resp.Body).Decode(&report); err != nil {
 		return nil, fmt.Errorf("error decodificando stats: %v", err)
 	}

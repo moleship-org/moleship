@@ -8,7 +8,7 @@ import (
 
 type ContainerService interface {
 	// List returns all running quadlets available on the system or an error if they cannot be retrieved.
-	List(ctx context.Context, filters Filters) ([]model.ContainerEntity, error)
+	List(ctx context.Context, filters model.Filters) ([]model.ContainerEntity, error)
 
 	// GetByID returns the quadlet with the given id or ErrQuadletNotFound if it does not exist.
 	GetByID(ctx context.Context, id string) (*model.ContainerEntity, error)
