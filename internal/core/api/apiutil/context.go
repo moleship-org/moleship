@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -59,6 +60,12 @@ type Context interface {
 
 	// QueryParam returns the first value associated with the given key.
 	QueryParam(key string) string
+
+	// Logger returns the application structured logger.
+	Logger() *slog.Logger
+
+	// SetLogger sets the application structured logger.
+	SetLogger(lg *slog.Logger)
 }
 
 // ContextBinder defines request body binding behavior for a context.
@@ -110,6 +117,8 @@ type contextImpl struct {
 	req *http.Request
 
 	formDecoder *form.Decoder
+
+	logger *slog.Logger
 }
 
 var _ Context = (*contextImpl)(nil)
@@ -157,6 +166,17 @@ func (c *contextImpl) QueryParam(key string) string {
 	return c.req.URL.Query().Get(key)
 }
 
+func (c *contextImpl) Logger() *slog.Logger {
+	if c.logger == nil {
+		return slog.Default()
+	}
+	return c.logger
+}
+
+func (c *contextImpl) SetLogger(lg *slog.Logger) {
+	c.logger = lg
+}
+
 /**** WRITERS ****/
 
 func (c *contextImpl) Status(status int) error {
@@ -168,7 +188,9 @@ func (c *contextImpl) Bytes(status int, blob []byte) error {
 	c.Header().Set("Content-Type", "application/octet-stream")
 	c.Header().Set("Content-Length", strconv.Itoa(len(blob)))
 
-	c.rw.WriteHeader(status)
+	if status != http.StatusOK {
+		c.rw.WriteHeader(status)
+	}
 	_, err := c.rw.Write(blob)
 	return err
 }

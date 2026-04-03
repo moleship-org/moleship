@@ -1,13 +1,16 @@
 package handler
 
 import (
-	"fmt"
+	"errors"
+	"io"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
 	"github.com/moleship-org/moleship/internal/core/api/serializer"
+	"github.com/moleship-org/moleship/internal/core/service"
 	"github.com/moleship-org/moleship/internal/domain/port"
 )
 
@@ -25,7 +28,7 @@ func NewContainer(s port.ContainerService) *Container {
 
 // List GET /api/v1/containers
 func (h *Container) List(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
+	c := apiutil.FromRequest(w, r)
 
 	quadlets, err := h.containerSvc.List(r.Context(), nil)
 	if err != nil {
@@ -34,100 +37,152 @@ func (h *Container) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if quadlets == nil {
-		ctx.Status(http.StatusNotFound)
+		c.Status(http.StatusNotFound)
 		return
 	}
 
 	res := serializer.ListContainer{Data: quadlets}
-	if err := ctx.JSON(http.StatusOK, res); err != nil {
-		ctx.Error(http.StatusInternalServerError, "Failed to encode response")
+	if err := c.JSON(http.StatusOK, res); err != nil {
+		c.Error(http.StatusInternalServerError, "Failed to encode response")
 	}
 }
 
 // GetByName GET /api/v1/containers/{name}
 func (h *Container) GetByName(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
+	c := apiutil.FromRequest(w, r)
 
-	name := ctx.PathValue("name")
+	name := c.PathValue("name")
 	if strings.TrimSpace(name) == "" {
-		ctx.Error(http.StatusBadRequest, "Empty container name")
-		return
-	}
-
-	ok, err := h.containerSvc.Exists(r.Context(), name)
-	if err != nil {
-		ctx.Error(http.StatusInternalServerError, "internal error on checking if container exists")
-		return
-	}
-	if !ok {
-		ctx.Status(http.StatusNotFound)
+		c.Error(http.StatusBadRequest, "Empty container name")
 		return
 	}
 
 	quadlet, err := h.containerSvc.GetByName(r.Context(), name)
+	if errors.Is(err, service.ErrContainertNotFound) {
+		c.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
-		ctx.Status(http.StatusNotFound)
+		c.Error(http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	res := serializer.GetContainer{Data: quadlet}
-	if err := ctx.JSON(http.StatusOK, res); err != nil {
-		ctx.Error(http.StatusInternalServerError, "Failed to encode response")
+	if err := c.JSON(http.StatusOK, res); err != nil {
+		c.Error(http.StatusInternalServerError, "Failed to encode response")
 	}
 }
 
-// PATCH /api/v1/containers/{name}/systemd/start
+// POST /api/v1/containers/{name}/start
 func (h *Container) Start(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
-	ctx.Status(http.StatusNotImplemented)
+	c := apiutil.FromRequest(w, r)
+
+	name := c.PathValue("name")
+	if strings.TrimSpace(name) == "" {
+		c.Error(http.StatusBadRequest, "empty container name")
+		return
+	}
+
+	err := h.containerSvc.Start(r.Context(), name)
+	if err != nil {
+		c.Error(http.StatusInternalServerError, "internal error trying to start container")
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
-// PATCH /api/v1/containers/{name}/systemd/stop
+// POST /api/v1/containers/{name}/stop
 func (h *Container) Stop(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
-	ctx.Status(http.StatusNotImplemented)
+	c := apiutil.FromRequest(w, r)
+
+	name := c.PathValue("name")
+	if strings.TrimSpace(name) == "" {
+		c.Error(http.StatusBadRequest, "empty container name")
+		return
+	}
+
+	err := h.containerSvc.Stop(r.Context(), name)
+	if err != nil {
+		c.Error(http.StatusInternalServerError, "internal error trying to stop container")
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
-// PATCH /api/v1/containers/{name}/systemd/restart
+// POST /api/v1/containers/{name}/restart
 func (h *Container) Restart(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
-	ctx.Status(http.StatusNotImplemented)
+	c := apiutil.FromRequest(w, r)
+
+	name := c.PathValue("name")
+	if strings.TrimSpace(name) == "" {
+		c.Error(http.StatusBadRequest, "empty container name")
+		return
+	}
+
+	err := h.containerSvc.Restart(r.Context(), name)
+	if err != nil {
+		c.Error(http.StatusInternalServerError, "internal error trying to restart container")
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 // GET /api/v1/containers/{name}/stats
 func (h *Container) Stats(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
+	c := apiutil.FromRequest(w, r)
 
-	name := ctx.PathValue("name")
+	name := c.PathValue("name")
 	if strings.TrimSpace(name) == "" {
-		ctx.Error(http.StatusBadRequest, "Empty container name")
-		return
-	}
-
-	ok, err := h.containerSvc.Exists(r.Context(), name)
-	if err != nil {
-		ctx.Error(http.StatusInternalServerError, "internal error on checking if container exists")
-		return
-	}
-	if !ok {
-		ctx.Status(http.StatusNotFound)
+		c.Error(http.StatusBadRequest, "Empty container name")
 		return
 	}
 
 	stats, err := h.containerSvc.Stats(r.Context(), name)
+	if errors.Is(err, service.ErrContainertNotFound) {
+		c.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
-		fmt.Println(stats, err)
-		ctx.Error(http.StatusInternalServerError, "internal error trying to get resources of the container")
+		log.Println(stats, err)
+		c.Error(http.StatusInternalServerError, "internal error trying to get resources of the container")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, stats)
+	c.JSON(http.StatusOK, stats)
 }
 
 // GET /api/v1/containers/{name}/logs
 func (h *Container) Logs(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
-	ctx.Status(http.StatusNotImplemented)
+	c := apiutil.FromRequest(w, r)
+
+	name := c.PathValue("name")
+	if strings.TrimSpace(name) == "" {
+		c.Error(http.StatusBadRequest, "empty container name")
+		return
+	}
+
+	logs, err := h.containerSvc.Logs(r.Context(), name, c.Request().URL.Query())
+	if errors.Is(err, service.ErrContainertNotFound) {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		c.Error(http.StatusInternalServerError, "internal error trying to get logs")
+		return
+	}
+	defer logs.Close()
+
+	c.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	c.Status(http.StatusOK)
+
+	_, copyErr := io.Copy(c.Writer(), logs)
+	if copyErr != nil {
+		// cannot modify status after header/body write, log internally if required
+		c.Logger().Debug("failed to stream logs for %s: %v\n", name, copyErr)
+	}
 }
 
 func (h *Container) Mux(r chi.Router) {
@@ -136,9 +191,9 @@ func (h *Container) Mux(r chi.Router) {
 		r.Get("/", h.List)
 		r.Get("/{name}", h.GetByName)
 		// Systemd actions
-		r.Patch("/{name}/systemd/start", h.Start)
-		r.Patch("/{name}/systemd/stop", h.Stop)
-		r.Patch("/{name}/systemd/restart", h.Restart)
+		r.Post("/{name}/start", h.Start)
+		r.Post("/{name}/stop", h.Stop)
+		r.Post("/{name}/restart", h.Restart)
 		// Status and logs
 		r.Get("/{name}/stats", h.Stats)
 		r.Get("/{name}/logs", h.Logs)

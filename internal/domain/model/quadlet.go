@@ -1,10 +1,134 @@
 package model
 
+import (
+	"fmt"
+	"strings"
+)
+
+type RawQuadletFile struct {
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Content []byte `json:"content"`
+}
+
 type QuadletFile struct {
+	Name      string           `json:"name"`
+	Path      string           `json:"path"`
 	Unit      UnitOptions      `json:"unit,omitempty"`
 	Service   ServiceOptions   `json:"service,omitempty"`
 	Container ContainerOptions `json:"container,omitempty"`
 	Install   InstallOptions   `json:"install,omitempty"`
+}
+
+func (q *QuadletFile) String() string {
+	var sb strings.Builder
+
+	// --- [Unit] ---
+	if !isUnitEmpty(q.Unit) {
+		sb.WriteString("[Unit]\n")
+		writeString(&sb, "Description", q.Unit.Description)
+		writeSlice(&sb, "Requires", q.Unit.Requires)
+		writeSlice(&sb, "Wants", q.Unit.Wants)
+		writeSlice(&sb, "After", q.Unit.After)
+		writeSlice(&sb, "Before", q.Unit.Before)
+		sb.WriteString("\n")
+	}
+
+	// --- [Service] ---
+	if !isServiceEmpty(q.Service) {
+		sb.WriteString("[Service]\n")
+		writeString(&sb, "Restart", q.Service.Restart)
+		writeString(&sb, "TimeoutStartSec", q.Service.TimeoutStartSec)
+		writeString(&sb, "TimeoutStopSec", q.Service.TimeoutStopSec)
+		writeSlice(&sb, "Environment", q.Service.Environment)
+		writeSlice(&sb, "ExecStartPre", q.Service.ExecStartPre)
+		writeSlice(&sb, "ExecStartPost", q.Service.ExecStartPost)
+		sb.WriteString("\n")
+	}
+
+	// --- [Container] ---
+	sb.WriteString("[Container]\n")
+	writeString(&sb, "Image", q.Container.Image)
+	writeString(&sb, "ContainerName", q.Container.ContainerName)
+
+	// Network & Ports
+	writeSlice(&sb, "Network", q.Container.Network)
+	writeSlice(&sb, "PublishPort", q.Container.PublishPort)
+	writeSlice(&sb, "ExposeHostPort", q.Container.ExposeHostPort)
+
+	// Volumes
+	writeSlice(&sb, "Volume", q.Container.Volume)
+	writeSlice(&sb, "Mount", q.Container.Mount)
+
+	// Env & Secrets
+	writeSlice(&sb, "Environment", q.Container.Environment)
+	writeSlice(&sb, "EnvironmentFile", q.Container.EnvironmentFile)
+	writeSlice(&sb, "Secret", q.Container.Secret)
+
+	// Execution
+	writeString(&sb, "Exec", q.Container.Exec)
+	writeString(&sb, "Args", q.Container.Args)
+	writeString(&sb, "Entrypoint", q.Container.Entrypoint)
+
+	// Lifecycle
+	writeString(&sb, "AutoUpdate", q.Container.AutoUpdate)
+	writeBool(&sb, "Removable", q.Container.Removable)
+
+	// Metadata
+	writeSlice(&sb, "Label", q.Container.Label)
+	writeSlice(&sb, "Annotation", q.Container.Annotation)
+
+	// Security
+	writeString(&sb, "User", q.Container.User)
+	writeString(&sb, "UserNS", q.Container.UserNS)
+	writeSlice(&sb, "DropCapability", q.Container.DropCapability)
+	writeSlice(&sb, "AddCapability", q.Container.AddCapability)
+	writeBool(&sb, "SecurityLabelDisable", q.Container.SecurityLabelDisable)
+
+	// Health & Misc
+	writeString(&sb, "HealthCmd", q.Container.HealthCmd)
+	writeString(&sb, "Timezone", q.Container.Timezone)
+	writeString(&sb, "Pod", q.Container.Pod)
+	sb.WriteString("\n")
+
+	// --- [Install] ---
+	if !isInstallEmpty(q.Install) {
+		sb.WriteString("[Install]\n")
+		writeSlice(&sb, "WantedBy", q.Install.WantedBy)
+		writeSlice(&sb, "RequiredBy", q.Install.RequiredBy)
+	}
+
+	return sb.String()
+}
+
+func writeString(sb *strings.Builder, key, value string) {
+	if value != "" {
+		sb.WriteString(fmt.Sprintf("%s=%s\n", key, value))
+	}
+}
+
+func writeSlice(sb *strings.Builder, key string, values []string) {
+	for _, v := range values {
+		sb.WriteString(fmt.Sprintf("%s=%s\n", key, v))
+	}
+}
+
+func writeBool(sb *strings.Builder, key string, value *bool) {
+	if value != nil {
+		sb.WriteString(fmt.Sprintf("%s=%v\n", key, *value))
+	}
+}
+
+func isUnitEmpty(u UnitOptions) bool {
+	return u.Description == "" && len(u.Requires) == 0 && len(u.Wants) == 0 && len(u.After) == 0 && len(u.Before) == 0
+}
+
+func isServiceEmpty(s ServiceOptions) bool {
+	return s.Restart == "" && len(s.Environment) == 0 && len(s.ExecStartPre) == 0
+}
+
+func isInstallEmpty(i InstallOptions) bool {
+	return len(i.WantedBy) == 0 && len(i.RequiredBy) == 0
 }
 
 // [Unit]

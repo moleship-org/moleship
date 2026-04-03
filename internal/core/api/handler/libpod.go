@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/moleship-org/moleship/internal/adapter/podman"
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
 	"github.com/moleship-org/moleship/internal/domain/port"
 )
@@ -28,8 +31,13 @@ func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
 		path = "_ping"
 	}
 	libpodPath := strings.Split(path, "/")
+	libpodPath = append(libpodPath, "?", r.URL.Query().Encode())
 
 	res, err := p.podmanProv.RawCall(r.Context(), r.Method, libpodPath...)
+	if errors.Is(err, podman.ErrContainerNotFound) {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		ctx.Error(http.StatusInternalServerError, "error trying to call podman socket")
 		return
@@ -38,8 +46,10 @@ func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
 
 	if res.Body != nil {
 		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			ctx.Error(http.StatusInternalServerError, "error trying to read request body")
+		log.Println(string(b), err)
+		if err != nil && err != io.EOF {
+			ctx.Error(http.StatusInternalServerError, "error when trying to read request body")
+			return
 		}
 
 		ctx.Bytes(res.StatusCode, b)

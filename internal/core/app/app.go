@@ -42,8 +42,10 @@ func (a *Application) Start(ctx context.Context) {
 	a.Prepare()
 
 	server := &http.Server{
-		Addr:    a.Addr(),
-		Handler: a.router,
+		Addr:         a.Addr(),
+		Handler:      a.router,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 15 * time.Second,
 	}
 
 	serverErrors := make(chan error, 1)
@@ -114,7 +116,7 @@ func (a *Application) Prepare() {
 		QuadletDir: a.cfg.QuadletDir,
 	})
 
-	a.router.Use(middleware.ContextInjector)
+	a.router.Use(middleware.ContextInjector(a.Logger()))
 	a.router.Use(middleware.Logger(a.Logger()))
 	a.router.Use(chi_middleware.Recoverer)
 	a.router.Use(chi_middleware.RequestID)

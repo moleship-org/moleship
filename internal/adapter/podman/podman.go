@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
-	"time"
 
 	"github.com/containers/podman/v5/pkg/domain/entities"
 	"github.com/moleship-org/moleship/internal/domain/model"
@@ -36,19 +38,24 @@ func New(params *NewAdapterParams) *Adapter {
 		},
 	}
 
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   0,
+	}
+
 	return &Adapter{
 		socketPath: params.SocketPath,
 		version:    params.Version,
 		libpodUri:  fmt.Sprintf("http://d/v%s/libpod", params.Version),
-		client:     &http.Client{Transport: transport, Timeout: 5 * time.Second},
+		client:     client,
 	}
 }
 
 func (a *Adapter) getEndpoint(params ...string) string {
 	uri := a.libpodUri
-	for _, param := range params {
+	for i, param := range params {
 		if strings.HasPrefix(param, "?") {
-			uri += param
+			uri += strings.Join(params[i:], "")
 			break
 		} else {
 			uri += "/" + param
@@ -59,22 +66,38 @@ func (a *Adapter) getEndpoint(params ...string) string {
 
 func (a *Adapter) RawCall(ctx context.Context, method string, path ...string) (*http.Response, error) {
 	endpoint := a.getEndpoint(path...)
+	log.Println("Endpoint", endpoint)
 
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	res, err := a.client.Do(req)
 	if err != nil {
-		return nil, ErrConnectionRefused
+		return nil, fmt.Errorf("%w: %v", ErrConnectionRefused, err)
+	}
+
+	if res.StatusCode >= 400 {
+		defer res.Body.Close()
+
+		var podmanErr struct {
+			Cause   string `json:"cause"`
+			Message string `json:"message"`
+		}
+
+		if decodeErr := json.NewDecoder(res.Body).Decode(&podmanErr); decodeErr == nil {
+			return nil, fmt.Errorf("podman api error (%d): %s - %s",
+				res.StatusCode, podmanErr.Cause, podmanErr.Message)
+		}
+
+		return nil, fmt.Errorf("podman api returned unexpected status: %d", res.StatusCode)
 	}
 
 	return res, nil
 }
-
 func (a *Adapter) Ping(ctx context.Context) (http.Header, error) {
-	res, err := a.RawCall(ctx, "GET", "_ping")
+	res, err := a.RawCall(ctx, http.MethodGet, "_ping")
 	if err != nil {
 		return nil, err
 	}
@@ -87,12 +110,12 @@ func (a *Adapter) Ping(ctx context.Context) (http.Header, error) {
 	return res.Header, nil
 }
 
-func (a *Adapter) ListContainers(ctx context.Context, filters model.Filters) ([]entities.ListContainer, error) {
-	if filters == nil {
-		filters = make(model.Filters)
+func (a *Adapter) ListContainers(ctx context.Context, opts url.Values) ([]entities.ListContainer, error) {
+	if opts == nil {
+		opts = make(url.Values)
 	}
 
-	res, err := a.RawCall(ctx, "GET", "containers", "json", filters.Query())
+	res, err := a.RawCall(ctx, http.MethodGet, "containers", "json", "?", opts.Encode())
 	if err != nil {
 		return nil, err
 	}
@@ -104,50 +127,40 @@ func (a *Adapter) ListContainers(ctx context.Context, filters model.Filters) ([]
 
 	var containers []entities.ListContainer
 	if err := json.NewDecoder(res.Body).Decode(&containers); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
+		return nil, ErrInvalidResponse
 	}
 
 	return containers, nil
 }
 
 func (a *Adapter) GetVersion(ctx context.Context) (*model.PodmanSystemVersion, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", a.getEndpoint("version"), nil)
+	res, err := a.RawCall(ctx, http.MethodGet, "version")
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionRefused, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: status %s", ErrInvalidResponse, resp.Status)
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %s", ErrInvalidResponse, res.Status)
 	}
 
-	var v entities.ComponentVersion
-	if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
+	var cv entities.ComponentVersion
+	if err := json.NewDecoder(res.Body).Decode(&cv); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
 	}
 
-	res := &model.PodmanSystemVersion{Data: v}
-	return res, nil
+	pv := &model.PodmanSystemVersion{Data: cv}
+	return pv, nil
 }
 
 func (a *Adapter) Exists(ctx context.Context, name string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", a.getEndpoint("containers", "systemd-"+name, "exists"), nil)
+	res, err := a.RawCall(ctx, http.MethodGet, "containers", name, "exists")
 	if err != nil {
 		return false, err
 	}
+	defer res.Body.Close()
 
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return false, fmt.Errorf("%w: %v", ErrConnectionRefused, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNoContent {
+	if res.StatusCode == http.StatusNoContent {
 		return true, nil
 	}
 
@@ -155,27 +168,43 @@ func (a *Adapter) Exists(ctx context.Context, name string) (bool, error) {
 }
 
 func (a *Adapter) Stats(ctx context.Context, name string) (*model.ContainerStats, error) {
-	endpoint := a.getEndpoint("containers", "systemd-"+name, "stats") + "?stream=false"
+	res, err := a.RawCall(ctx, http.MethodGet, "containers", name, "stats", "?stream=false")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if res.StatusCode == http.StatusNotFound {
+		return nil, ErrContainerNotFound
+	}
+	if res.StatusCode == http.StatusInternalServerError {
+		return nil, fmt.Errorf("podman adapter internal error")
+	}
+
+	var report model.ContainerStats
+	if err := json.NewDecoder(res.Body).Decode(&report); err != nil {
+		return nil, ErrInvalidResponse
+	}
+
+	return &report, nil
+}
+
+func (a *Adapter) Logs(ctx context.Context, name string, opts url.Values) (io.ReadCloser, error) {
+	if opts == nil {
+		opts = make(url.Values)
+	}
+
+	res, err := a.RawCall(ctx, http.MethodGet, "containers", name, "logs", "?", opts.Encode())
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionRefused, err)
+	if res.StatusCode == http.StatusNotFound {
+		return nil, ErrContainerNotFound
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error de podman: código %d", resp.StatusCode)
+	if res.StatusCode == http.StatusInternalServerError {
+		return nil, fmt.Errorf("internal error when trying to get logs")
 	}
 
-	var report model.ContainerStats
-	if err := json.NewDecoder(resp.Body).Decode(&report); err != nil {
-		return nil, fmt.Errorf("error decodificando stats: %v", err)
-	}
-
-	return &report, nil
+	return res.Body, nil
 }

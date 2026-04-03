@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
+	"github.com/moleship-org/moleship/internal/core/api/serializer"
 	"github.com/moleship-org/moleship/internal/domain/port"
 )
 
@@ -20,12 +21,20 @@ func NewQuadlet(s port.QuadletService) *Quadlet {
 
 // --- Quadlet File Operations
 
-func (h *Quadlet) ListFiles(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
-	ctx.Status(http.StatusNotImplemented)
+func (h *Quadlet) List(w http.ResponseWriter, r *http.Request) {
+	c := apiutil.FromRequest(w, r)
+
+	quadlets, err := h.quadletSvc.List(r.Context())
+	if err != nil {
+		c.Error(http.StatusInternalServerError, "error trying to get the quadlet list")
+		return
+	}
+
+	v := &serializer.ListQuadlets{Data: quadlets}
+	c.JSON(http.StatusOK, v)
 }
 
-func (h *Quadlet) GetFileByName(w http.ResponseWriter, r *http.Request) {
+func (h *Quadlet) GetByName(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 	ctx.Status(http.StatusNotImplemented)
 }
@@ -52,8 +61,8 @@ func (h *Quadlet) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *Quadlet) Mux(r chi.Router) {
 	r.Route("/quadlets", func(r chi.Router) {
-		r.Get("/", h.ListFiles)
-		r.Get("/{name}", h.GetFileByName)
+		r.Get("/", h.List)
+		r.Get("/{name}", h.GetByName)
 		r.Post("/", h.Create)
 		r.Put("/{name}", h.ReplaceOrCreate)
 		r.Patch("/{name}", h.Update)

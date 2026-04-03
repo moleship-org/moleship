@@ -8,6 +8,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-playground/form v3.1.4+incompatible
 	github.com/spf13/cobra v1.10.2
+	gopkg.in/ini.v1 v1.67.1
 )
 
 require (

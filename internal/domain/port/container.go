@@ -2,13 +2,15 @@ package port
 
 import (
 	"context"
+	"io"
+	"net/url"
 
 	"github.com/moleship-org/moleship/internal/domain/model"
 )
 
 type ContainerService interface {
 	// List returns all running quadlets available on the system or an error if they cannot be retrieved.
-	List(ctx context.Context, filters model.Filters) ([]model.ContainerEntity, error)
+	List(ctx context.Context, opts url.Values) ([]model.ContainerEntity, error)
 
 	// GetByID returns the quadlet with the given id or ErrQuadletNotFound if it does not exist.
 	GetByID(ctx context.Context, id string) (*model.ContainerEntity, error)
@@ -30,4 +32,7 @@ type ContainerService interface {
 
 	// Stats returns a container's resource usage.
 	Stats(ctx context.Context, name string) (*model.ContainerStats, error)
+
+	// Logs returns a stream of logs.
+	Logs(ctx context.Context, name string, opts url.Values) (io.ReadCloser, error)
 }
