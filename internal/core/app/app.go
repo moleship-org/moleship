@@ -124,10 +124,9 @@ func (a *Application) Prepare() {
 	a.router.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
 			handler.NewHealth().Mux(r)
-
 			handler.NewContainer(containerSvc).Mux(r)
-
 			handler.NewQuadlet(quadletSvc).Mux(r)
+			handler.NewLibpod(podmanAdapter).Mux(r)
 		})
 	})
 }

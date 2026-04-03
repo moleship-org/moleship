@@ -52,11 +52,8 @@ func (h *Quadlet) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *Quadlet) Mux(r chi.Router) {
 	r.Route("/quadlets", func(r chi.Router) {
-		// Get all quadlet files
 		r.Get("/", h.ListFiles)
-		// Get one quadlet file
 		r.Get("/{name}", h.GetFileByName)
-		// Create, Update and Delete
 		r.Post("/", h.Create)
 		r.Put("/{name}", h.ReplaceOrCreate)
 		r.Patch("/{name}", h.Update)
