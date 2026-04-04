@@ -2,7 +2,7 @@
     "swagger": "2.0",
     "info": {
         "description": "Esta es una descripción detallada de lo que hace mi API.",
-        "title": "Mi API de Microservicios",
+        "title": "Moleship API",
         "termsOfService": "http://swagger.io/terms/",
         "contact": {
             "name": "Soporte API",

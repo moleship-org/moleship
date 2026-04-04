@@ -17,6 +17,9 @@ type QuadletService interface {
 	// Get returns a quadlet unit file information if it exists.
 	Get(ctx context.Context, name string) (*model.QuadletFile, error)
 
+	// Exists checks if a quadlet file exists.
+	Exists(ctx context.Context, name string) (bool, error)
+
 	// Create creates a new quadlet file with the given name and options.
 	Create(ctx context.Context, name string, qf *model.QuadletFile) error
 

@@ -5,12 +5,6 @@ import (
 	"strings"
 )
 
-type RawQuadletFile struct {
-	Name    string `json:"name"`
-	Path    string `json:"path"`
-	Content []byte `json:"content"`
-}
-
 type QuadletFile struct {
 	Name      string           `json:"name"`
 	Path      string           `json:"path"`

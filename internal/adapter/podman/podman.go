@@ -162,7 +162,7 @@ func (a *Adapter) Exists(ctx context.Context, name string) (bool, error) {
 		return true, nil
 	}
 
-	return false, ErrContainerNotFound
+	return false, nil
 }
 
 func (a *Adapter) Stats(ctx context.Context, name string) (*model.ContainerStats, error) {
