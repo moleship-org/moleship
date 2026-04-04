@@ -10,11 +10,8 @@ import (
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
 	"github.com/moleship-org/moleship/internal/core/api/serializer"
 	"github.com/moleship-org/moleship/internal/core/service"
-	"github.com/moleship-org/moleship/internal/domain/model"
 	"github.com/moleship-org/moleship/internal/domain/port"
 )
-
-type ContainerStats = model.ContainerStats
 
 type Container struct {
 	containerSvc port.ContainerService
