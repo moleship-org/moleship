@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
@@ -23,13 +22,20 @@ func NewLibpod(s port.PodmanProvider) *Libpod {
 	}
 }
 
+// Libpod godoc
+//
+//	@Summary		Proxy to Podman API
+//	@Description	Proxies requests to the Podman API
+//	@Tags			libpod
+//	@Accept			json
+//	@Produce		json
+//	@Param			path	path	string	true	"API path"
+//	@Success		200
+//	@Router			/libpod/{path} [get]
 func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 	path := ctx.PathValue("*")
 
-	if path == "" {
-		path = "_ping"
-	}
 	libpodPath := strings.Split(path, "/")
 	libpodPath = append(libpodPath, "?", r.URL.Query().Encode())
 
@@ -46,7 +52,6 @@ func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
 
 	if res.Body != nil {
 		b, err := io.ReadAll(res.Body)
-		log.Println(string(b), err)
 		if err != nil && err != io.EOF {
 			ctx.Error(http.StatusInternalServerError, "error when trying to read request body")
 			return

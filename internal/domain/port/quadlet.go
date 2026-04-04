@@ -6,6 +6,10 @@ import (
 	"github.com/moleship-org/moleship/internal/domain/model"
 )
 
+// QuadletService provides an interface for managing quadlet files.
+// Quadlets are systemd unit files that describe how to run containers using Podman.
+// This interface allows listing, retrieving, creating, updating, and deleting quadlet files,
+// as well as reloading the systemd daemon to apply changes.
 type QuadletService interface {
 	// List returns all quadlets files on the system.
 	List(ctx context.Context) ([]model.QuadletFile, error)

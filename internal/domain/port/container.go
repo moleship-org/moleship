@@ -8,8 +8,11 @@ import (
 	"github.com/moleship-org/moleship/internal/domain/model"
 )
 
+// ContainerService provides an interface for managing containers through quadlets.
+// It abstracts container operations such as listing, retrieving, starting, stopping,
+// and monitoring containers that are managed via systemd quadlet units.
 type ContainerService interface {
-	// List returns all running quadlets available on the system or an error if they cannot be retrieved.
+	// List retrieves all running containers managed by quadlets on the system.
 	List(ctx context.Context, opts url.Values) ([]model.ContainerEntity, error)
 
 	// GetByID returns the quadlet with the given id or ErrQuadletNotFound if it does not exist.

@@ -10,11 +10,20 @@ import (
 	"github.com/moleship-org/moleship/internal/domain/model"
 )
 
+// PodmanProvider provides an interface for interacting with the Podman API.
+// It abstracts low-level Podman operations, including raw API calls, connectivity checks,
+// version retrieval, container management, and resource monitoring.
 type PodmanProvider interface {
-	// RawCall makes a call to the podman socket.
+	// RawCall performs a direct HTTP call to the Podman socket API.
+	// The method parameter specifies the HTTP method (e.g., "GET", "POST").
+	// The path parameter is a variadic list of path segments to append to the base API URL.
+	// Returns the HTTP response, which the caller is responsible for closing.
+	// Returns an error if the request fails or if connectivity issues occur.
 	RawCall(ctx context.Context, method string, path ...string) (*http.Response, error)
 
-	// Ping checks connectivity to the Podman service and returns an error if unreachable.
+	// Ping checks the connectivity to the Podman service.
+	// Returns the response headers from the ping request.
+	// Returns an error if Podman is unreachable or not responding.
 	Ping(ctx context.Context) (http.Header, error)
 
 	// GetVersion returns the podman system version component.

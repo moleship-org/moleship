@@ -12,11 +12,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/moleship-org/moleship/docs"
 	"github.com/moleship-org/moleship/internal/adapter/podman"
 	"github.com/moleship-org/moleship/internal/adapter/systemd"
 	"github.com/moleship-org/moleship/internal/core/api/handler"
 	"github.com/moleship-org/moleship/internal/core/api/middleware"
 	"github.com/moleship-org/moleship/internal/core/service"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 type Application struct {
@@ -122,6 +124,16 @@ func (a *Application) Prepare() {
 	a.router.Use(chi_middleware.RequestID)
 	a.router.Use(chi_middleware.RealIP)
 	a.router.Use(chi_middleware.Timeout(60 * time.Second))
+
+	if a.cfg.Mode != "production" {
+		a.router.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(docs.SwaggerInfo.SwaggerTemplate))
+		})
+
+		url := fmt.Sprintf("http://localhost:%d/swagger/doc.json", a.cfg.Port)
+		a.router.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(url)))
+	}
 
 	a.router.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {

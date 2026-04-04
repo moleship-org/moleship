@@ -6,6 +6,15 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Health godoc
+//
+//	@Summary		Health check
+//	@Description	Check server health
+//	@Tags			health
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{string}	string	"OK"
+//	@Router			/health [get]
 type Health struct {
 	allows string
 }

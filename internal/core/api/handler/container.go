@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
@@ -11,8 +10,11 @@ import (
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
 	"github.com/moleship-org/moleship/internal/core/api/serializer"
 	"github.com/moleship-org/moleship/internal/core/service"
+	"github.com/moleship-org/moleship/internal/domain/model"
 	"github.com/moleship-org/moleship/internal/domain/port"
 )
+
+type ContainerStats = model.ContainerStats
 
 type Container struct {
 	containerSvc port.ContainerService
@@ -24,9 +26,17 @@ func NewContainer(s port.ContainerService) *Container {
 	}
 }
 
-// --- Container Entity Operations
-
-// List GET /api/v1/containers
+// GET /api/v1/containers
+//
+//	@Summary		List containers
+//	@Description	Get all running containers managed by quadlets
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		json
+//	@Param			opts	query		url.Values			false	"Query options"
+//	@Success		200		{object}	serializer.ListContainer
+//	@Failure		500		{string}	string					"Internal server error"
+//	@Router			/containers [get]
 func (h *Container) List(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -48,6 +58,17 @@ func (h *Container) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetByName GET /api/v1/containers/{name}
+//
+//	@Summary		Get container by name
+//	@Description	Get a container by name
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string						true	"Container name"
+//	@Success		200		{object}	serializer.GetContainer
+//	@Failure		404		{string}	string						"Not found"
+//	@Failure		500		{string}	string						"Internal server error"
+//	@Router			/containers/{name} [get]
 func (h *Container) GetByName(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -74,6 +95,17 @@ func (h *Container) GetByName(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/containers/{name}/start
+//
+//	@Summary		Start container
+//	@Description	Start a container
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string	true	"Container name"
+//	@Success		204		{string}	string	"No content"
+//	@Failure		400		{string}	string	"Bad request"
+//	@Failure		500		{string}	string	"Internal server error"
+//	@Router			/containers/{name}/start [post]
 func (h *Container) Start(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -93,6 +125,17 @@ func (h *Container) Start(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/containers/{name}/stop
+//
+//	@Summary		Stop container
+//	@Description	Stop a container
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string	true	"Container name"
+//	@Success		204		{string}	string	"No content"
+//	@Failure		400		{string}	string	"Bad request"
+//	@Failure		500		{string}	string	"Internal server error"
+//	@Router			/containers/{name}/stop [post]
 func (h *Container) Stop(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -112,6 +155,17 @@ func (h *Container) Stop(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/containers/{name}/restart
+//
+//	@Summary		Restart container
+//	@Description	Restart a container
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string	true	"Container name"
+//	@Success		204		{string}	string	"No content"
+//	@Failure		400		{string}	string	"Bad request"
+//	@Failure		500		{string}	string	"Internal server error"
+//	@Router			/containers/{name}/restart [post]
 func (h *Container) Restart(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -131,6 +185,17 @@ func (h *Container) Restart(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/v1/containers/{name}/stats
+//
+//	@Summary		Get container stats
+//	@Description	Get resource usage statistics for a container
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string						true	"Container name"
+//	@Success		200		{object}	model.ContainerStats
+//	@Failure		404		{string}	string						"Not found"
+//	@Failure		500		{string}	string						"Internal server error"
+//	@Router			/containers/{name}/stats [get]
 func (h *Container) Stats(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -146,7 +211,6 @@ func (h *Container) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		log.Println(stats, err)
 		c.Error(http.StatusInternalServerError, "internal error trying to get resources of the container")
 		return
 	}
@@ -155,6 +219,18 @@ func (h *Container) Stats(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/v1/containers/{name}/logs
+//
+//	@Summary		Get container logs
+//	@Description	Get logs from a container
+//	@Tags			containers
+//	@Accept			json
+//	@Produce		text/plain
+//	@Param			name	path		string		true	"Container name"
+//	@Param			opts	query		url.Values	false	"Log options"
+//	@Success		200		{string}	string		"Logs stream"
+//	@Failure		404		{string}	string		"Not found"
+//	@Failure		500		{string}	string		"Internal server error"
+//	@Router			/containers/{name}/logs [get]
 func (h *Container) Logs(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 

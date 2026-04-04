@@ -14,10 +14,10 @@ type RawQuadletFile struct {
 type QuadletFile struct {
 	Name      string           `json:"name"`
 	Path      string           `json:"path"`
-	Unit      UnitOptions      `json:"unit,omitempty"`
-	Service   ServiceOptions   `json:"service,omitempty"`
-	Container ContainerOptions `json:"container,omitempty"`
-	Install   InstallOptions   `json:"install,omitempty"`
+	Unit      UnitOptions      `json:"unit"`
+	Service   ServiceOptions   `json:"service"`
+	Container ContainerOptions `json:"container"`
+	Install   InstallOptions   `json:"install"`
 }
 
 func (q *QuadletFile) String() string {

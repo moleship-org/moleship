@@ -37,3 +37,13 @@ You'll find the resulting binary in `_output/bin/{GOOS}/{GOARCH}/{BIN}`.
       - domain/                 # Business logic entities and interface
         - model/                # Data structs or records
         - port/                 # In and out interfaces
+
+## Docs
+
+### Swaggger
+
+    swag init -g cmd/moleship/main.go -d ./ --parseDependency --parseInternal
+
+### Godoc
+
+    go doc -http

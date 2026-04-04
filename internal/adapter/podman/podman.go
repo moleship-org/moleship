@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -66,7 +65,6 @@ func (a *Adapter) getEndpoint(params ...string) string {
 
 func (a *Adapter) RawCall(ctx context.Context, method string, path ...string) (*http.Response, error) {
 	endpoint := a.getEndpoint(path...)
-	log.Println("Endpoint", endpoint)
 
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
 	if err != nil {

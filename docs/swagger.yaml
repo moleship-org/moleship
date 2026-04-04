@@ -1,0 +1,904 @@
+basePath: /api/v1
+definitions:
+  define.ContainerSize:
+    properties:
+      rootFsSize:
+        type: integer
+      rwSize:
+        type: integer
+    type: object
+  entities.ListContainer:
+    properties:
+      Id:
+        description: The unique identifier for the container
+        type: string
+      autoRemove:
+        description: AutoRemove
+        type: boolean
+      cidfile:
+        description: CIDFile specified at creation time.
+        type: string
+      command:
+        description: Container command
+        items:
+          type: string
+        type: array
+      created:
+        description: Container creation time
+        type: string
+      createdAt:
+        description: Human-readable container creation time.
+        type: string
+      exitCode:
+        description: If container has exited, the return code from the command
+        format: int32
+        type: integer
+      exited:
+        description: If container has exited/stopped
+        type: boolean
+      exitedAt:
+        description: Time container exited
+        format: int64
+        type: integer
+      exposedPorts:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        description: |-
+          ExposedPorts contains the ports that are exposed but not forwarded,
+          see Ports for forwarded ports.
+          The key is the port number and the string slice contains the protocols,
+          i.e. "tcp", "udp" and "sctp".
+        type: object
+      image:
+        description: Container image
+        type: string
+      imageID:
+        description: Container image ID
+        type: string
+      isInfra:
+        description: If this container is a Pod infra container
+        type: boolean
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels for container
+        type: object
+      mounts:
+        description: User volume mounts
+        items:
+          type: string
+        type: array
+      names:
+        description: The names assigned to the container
+        items:
+          type: string
+        type: array
+      namespaces:
+        allOf:
+        - $ref: '#/definitions/types.ListContainerNamespaces'
+        description: |-
+          Namespaces the container belongs to.  Requires the
+          namespace boolean to be true
+      networks:
+        description: The network names assigned to the container
+        items:
+          type: string
+        type: array
+      pid:
+        description: The process id of the container
+        type: integer
+      pod:
+        description: |-
+          If the container is part of Pod, the Pod ID. Requires the pod
+          boolean to be set
+        type: string
+      podName:
+        description: |-
+          If the container is part of Pod, the Pod name. Requires the pod
+          boolean to be set
+        type: string
+      ports:
+        description: Port mappings
+        items:
+          $ref: '#/definitions/types.PortMapping'
+        type: array
+      restarts:
+        description: |-
+          Restarts is how many times the container was restarted by its
+          restart policy. This is NOT incremented by normal container restarts
+          (only by restart policy).
+        type: integer
+      size:
+        allOf:
+        - $ref: '#/definitions/define.ContainerSize'
+        description: Size of the container rootfs.  Requires the size boolean to be
+          true
+      startedAt:
+        description: Time when container started
+        format: int64
+        type: integer
+      state:
+        description: State of container
+        type: string
+      status:
+        description: Status is a human-readable approximation of a duration for json
+          output
+        type: string
+    type: object
+  github_com_moleship-org_moleship_internal_core_api_serializer.GetContainer:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.ContainerEntity'
+    type: object
+  github_com_moleship-org_moleship_internal_core_api_serializer.ListContainer:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.ContainerEntity'
+        type: array
+    type: object
+  github_com_moleship-org_moleship_internal_core_api_serializer.ListQuadlets:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+        type: array
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry:
+    properties:
+      major:
+        type: integer
+      minor:
+        type: integer
+      op:
+        description: '"Read", "Write", "Sync", "Async", "Total"'
+        type: string
+      value:
+        type: integer
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.BlkioStats:
+    properties:
+      io_merged_recursive:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry'
+        type: array
+      io_queue_recursive:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry'
+        type: array
+      io_service_bytes_recursive:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry'
+        type: array
+      io_service_time_recursive:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry'
+        type: array
+      io_serviced_recursive:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry'
+        type: array
+      io_time_recursive:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry'
+        type: array
+      io_wait_time_recursive:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry'
+        type: array
+      sectors_recursive:
+        items:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStatEntry'
+        type: array
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.CPUStats:
+    properties:
+      cpu_usage:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.CPUUsage'
+      online_cpus:
+        type: integer
+      system_cpu_usage:
+        type: integer
+      throttling_data:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.ThrottlingData'
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.CPUUsage:
+    properties:
+      total_usage:
+        type: integer
+      usage_in_kernelmode:
+        type: integer
+      usage_in_usermode:
+        type: integer
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.ContainerEntity:
+    properties:
+      container:
+        $ref: '#/definitions/entities.ListContainer'
+      name:
+        type: string
+      path:
+        type: string
+      status:
+        description: active, inactive, failed, etc.
+        type: string
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.ContainerOptions:
+    properties:
+      add_capability:
+        items:
+          type: string
+        type: array
+      annotation:
+        items:
+          type: string
+        type: array
+      args:
+        type: string
+      auto_update:
+        type: string
+      container_name:
+        type: string
+      drop_capability:
+        items:
+          type: string
+        type: array
+      entrypoint:
+        type: string
+      environment:
+        items:
+          type: string
+        type: array
+      environment_file:
+        items:
+          type: string
+        type: array
+      exec:
+        type: string
+      expose_host_port:
+        items:
+          type: string
+        type: array
+      health_cmd:
+        type: string
+      image:
+        type: string
+      label:
+        items:
+          type: string
+        type: array
+      mount:
+        items:
+          type: string
+        type: array
+      network:
+        items:
+          type: string
+        type: array
+      pod:
+        type: string
+      publish_port:
+        items:
+          type: string
+        type: array
+      removable:
+        type: boolean
+      secret:
+        items:
+          type: string
+        type: array
+      security_label_disable:
+        type: boolean
+      timezone:
+        type: string
+      user:
+        type: string
+      userns:
+        type: string
+      volume:
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.ContainerStats:
+    properties:
+      Id:
+        type: string
+      blkio_stats:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.BlkioStats'
+      cpu_stats:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.CPUStats'
+      memory_stats:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.MemoryStats'
+      name:
+        type: string
+      networks:
+        additionalProperties:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.Network'
+        type: object
+      num_procs:
+        type: integer
+      pids_stats:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.PidsStats'
+      precpu_stats:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.CPUStats'
+      preread:
+        type: string
+      read:
+        type: string
+      storage_stats:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.StorageStats'
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.InstallOptions:
+    properties:
+      required_by:
+        items:
+          type: string
+        type: array
+      wanted_by:
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.MemoryStats:
+    properties:
+      limit:
+        type: integer
+      usage:
+        type: integer
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.Network:
+    properties:
+      rx_bytes:
+        type: integer
+      rx_dropped:
+        type: integer
+      rx_errors:
+        type: integer
+      rx_packets:
+        type: integer
+      tx_bytes:
+        type: integer
+      tx_dropped:
+        type: integer
+      tx_errors:
+        type: integer
+      tx_packets:
+        type: integer
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.PidsStats:
+    properties:
+      current:
+        type: integer
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.QuadletFile:
+    properties:
+      container:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.ContainerOptions'
+      install:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.InstallOptions'
+      name:
+        type: string
+      path:
+        type: string
+      service:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.ServiceOptions'
+      unit:
+        $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.UnitOptions'
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.ServiceOptions:
+    properties:
+      environment:
+        items:
+          type: string
+        type: array
+      exec_start_post:
+        items:
+          type: string
+        type: array
+      exec_start_pre:
+        items:
+          type: string
+        type: array
+      restart:
+        type: string
+      timeout_start_sec:
+        type: string
+      timeout_stop_sec:
+        type: string
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.StorageStats:
+    properties:
+      read_count:
+        type: integer
+      read_size:
+        type: integer
+      write_count:
+        type: integer
+      write_size:
+        type: integer
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.ThrottlingData:
+    properties:
+      periods:
+        type: integer
+      throttled_periods:
+        type: integer
+      throttled_time:
+        type: integer
+    type: object
+  github_com_moleship-org_moleship_internal_domain_model.UnitOptions:
+    properties:
+      after:
+        items:
+          type: string
+        type: array
+      before:
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      requires:
+        items:
+          type: string
+        type: array
+      wants:
+        items:
+          type: string
+        type: array
+    type: object
+  types.ListContainerNamespaces:
+    properties:
+      Cgroup:
+        description: Cgroup namespace
+        type: string
+      Ipc:
+        description: IPC namespace
+        type: string
+      Mnt:
+        description: Mount namespace
+        type: string
+      Net:
+        description: Network namespace
+        type: string
+      Pidns:
+        description: PID namespace
+        type: string
+      User:
+        description: User namespace
+        type: string
+      Uts:
+        description: UTS namespace
+        type: string
+    type: object
+  types.PortMapping:
+    properties:
+      container_port:
+        description: |-
+          ContainerPort is the port number that will be exposed from the
+          container.
+          Mandatory.
+        type: integer
+      host_ip:
+        description: |-
+          HostIP is the IP that we will bind to on the host.
+          If unset, assumed to be 0.0.0.0 (all interfaces).
+        type: string
+      host_port:
+        description: |-
+          HostPort is the port number that will be forwarded from the host into
+          the container.
+          If omitted, a random port on the host (guaranteed to be over 1024)
+          will be assigned.
+        type: integer
+      protocol:
+        description: |-
+          Protocol is the protocol forward.
+          Must be either "tcp", "udp", and "sctp", or some combination of these
+          separated by commas.
+          If unset, assumed to be TCP.
+        type: string
+      range:
+        description: |-
+          Range is the number of ports that will be forwarded, starting at
+          HostPort and ContainerPort and counting up.
+          This is 1-indexed, so 1 is assumed to be a single port (only the
+          Hostport:Containerport mapping will be added), 2 is two ports (both
+          Hostport:Containerport and Hostport+1:Containerport+1), etc.
+          If unset, assumed to be 1 (a single port).
+          Both hostport + range and containerport + range must be less than
+          65536.
+        type: integer
+    type: object
+host: localhost:5000
+info:
+  contact:
+    email: soporte@tu-dominio.com
+    name: Soporte API
+    url: http://www.tu-sitio.com/support
+  description: Esta es una descripción detallada de lo que hace mi API.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Mi API de Microservicios
+  version: "1.0"
+paths:
+  /containers:
+    get:
+      consumes:
+      - application/json
+      description: Get all running containers managed by quadlets
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_core_api_serializer.ListContainer'
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: List containers
+      tags:
+      - containers
+  /containers/{name}:
+    get:
+      consumes:
+      - application/json
+      description: Get a container by name
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_core_api_serializer.GetContainer'
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Get container by name
+      tags:
+      - containers
+  /containers/{name}/logs:
+    get:
+      consumes:
+      - application/json
+      description: Get logs from a container
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Logs stream
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Get container logs
+      tags:
+      - containers
+  /containers/{name}/restart:
+    post:
+      consumes:
+      - application/json
+      description: Restart a container
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Restart container
+      tags:
+      - containers
+  /containers/{name}/start:
+    post:
+      consumes:
+      - application/json
+      description: Start a container
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Start container
+      tags:
+      - containers
+  /containers/{name}/stats:
+    get:
+      consumes:
+      - application/json
+      description: Get resource usage statistics for a container
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.ContainerStats'
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Get container stats
+      tags:
+      - containers
+  /containers/{name}/stop:
+    post:
+      consumes:
+      - application/json
+      description: Stop a container
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Stop container
+      tags:
+      - containers
+  /libpod/{path}:
+    get:
+      consumes:
+      - application/json
+      description: Proxies requests to the Podman API
+      parameters:
+      - description: API path
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Proxy to Podman API
+      tags:
+      - libpod
+  /quadlets:
+    get:
+      consumes:
+      - application/json
+      description: Get all quadlet files
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_core_api_serializer.ListQuadlets'
+      summary: List quadlets
+      tags:
+      - quadlets
+    post:
+      consumes:
+      - application/json
+      description: Create a new quadlet file
+      parameters:
+      - description: Quadlet name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Quadlet data
+        in: body
+        name: quadlet
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+        "501":
+          description: Not implemented
+          schema:
+            type: string
+      summary: Create quadlet
+      tags:
+      - quadlets
+  /quadlets/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a quadlet file
+      parameters:
+      - description: Quadlet name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+          schema:
+            type: string
+        "501":
+          description: Not implemented
+          schema:
+            type: string
+      summary: Delete quadlet
+      tags:
+      - quadlets
+    get:
+      consumes:
+      - application/json
+      description: Get a quadlet file by name
+      parameters:
+      - description: Quadlet name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+        "501":
+          description: Not implemented
+          schema:
+            type: string
+      summary: Get quadlet by name
+      tags:
+      - quadlets
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing quadlet file
+      parameters:
+      - description: Quadlet name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Override file
+        in: query
+        name: override
+        type: boolean
+      - description: Quadlet data
+        in: body
+        name: quadlet
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+        "501":
+          description: Not implemented
+          schema:
+            type: string
+      summary: Update quadlet
+      tags:
+      - quadlets
+    put:
+      consumes:
+      - application/json
+      description: Replace or create a quadlet file
+      parameters:
+      - description: Quadlet name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Quadlet data
+        in: body
+        name: quadlet
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_moleship-org_moleship_internal_domain_model.QuadletFile'
+        "501":
+          description: Not implemented
+          schema:
+            type: string
+      summary: Replace or create quadlet
+      tags:
+      - quadlets
+swagger: "2.0"
