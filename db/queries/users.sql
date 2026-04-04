@@ -13,27 +13,32 @@ WHERE email = ? LIMIT 1;
 -- name: ListUsers :many
 SELECT * FROM users
 WHERE deleted_at IS NULL
-ORDER BY created_at DESC;
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?;
 
 -- name: CountUsers :one
 SELECT count(*) FROM users;
 
 -- name: CreateUser :exec
 INSERT INTO users (
-    id, username, password_hash, email, is_admin
+    id, username, first_name, last_name, password_hash, email, is_admin
 ) VALUES (
-    ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?
 );
 
 -- name: UpdateUser :exec
 UPDATE users
-SET username = ?,
+SET 
+    username = ?,
+    first_name = ?,
+    last_name = ?,
+    password_hash = ?,
     email = ?,
     is_admin = ?,
     is_active = ?
 WHERE id = ?;
 
--- name: UpdateLastLogin :exec
+-- name: UpdateUserLastLogin :exec
 UPDATE users
 SET last_login = datetime('now')
 WHERE id = ?;

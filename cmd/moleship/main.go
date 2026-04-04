@@ -16,7 +16,7 @@ func main() {
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "moleship",
-		Short: "Moleship is ...",
+		Short: "moleship is a container management tool for Quadlets built on top of Podman and Systemd",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				cmd.Help()

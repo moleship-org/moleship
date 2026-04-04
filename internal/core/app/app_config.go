@@ -16,7 +16,8 @@ type Config struct {
 	PodmanSocket  string
 	PodmanVersion string
 	SystemctlPath string
-	QuadletDir    string
+	QuadletHome   string
+	DataHome      string
 	Port          uint16
 	Rootful       bool
 	Logger        *slog.Logger
@@ -29,7 +30,8 @@ func DefaultConfig() *Config {
 	c.PodmanSocket = e.PodmanSocket
 	c.PodmanVersion = e.PodmanVersion
 	c.SystemctlPath = e.SystemctlPath
-	c.QuadletDir = e.QuadletHome
+	c.QuadletHome = e.QuadletHome
+	c.DataHome = e.DataHome
 	c.Rootful = e.Rootful
 	c.Mode = e.Mode
 
@@ -97,10 +99,10 @@ func WithPodmanSocket(socket string) Option {
 	}
 }
 
-func WithQuadletDir(path string) Option {
+func WithQuadletHome(path string) Option {
 	return func(c *Config) {
 		if c != nil {
-			c.QuadletDir = path
+			c.QuadletHome = path
 		}
 	}
 }

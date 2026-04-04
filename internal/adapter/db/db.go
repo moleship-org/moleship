@@ -27,14 +27,29 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.activateUserStmt, err = db.PrepareContext(ctx, activateUser); err != nil {
 		return nil, fmt.Errorf("error preparing query ActivateUser: %w", err)
 	}
+	if q.cleanExpiredSessionsStmt, err = db.PrepareContext(ctx, cleanExpiredSessions); err != nil {
+		return nil, fmt.Errorf("error preparing query CleanExpiredSessions: %w", err)
+	}
 	if q.countUsersStmt, err = db.PrepareContext(ctx, countUsers); err != nil {
 		return nil, fmt.Errorf("error preparing query CountUsers: %w", err)
+	}
+	if q.createSessionStmt, err = db.PrepareContext(ctx, createSession); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateSession: %w", err)
 	}
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
 	}
 	if q.deactivateUserStmt, err = db.PrepareContext(ctx, deactivateUser); err != nil {
 		return nil, fmt.Errorf("error preparing query DeactivateUser: %w", err)
+	}
+	if q.deleteAllUserSessionsStmt, err = db.PrepareContext(ctx, deleteAllUserSessions); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllUserSessions: %w", err)
+	}
+	if q.deleteSessionStmt, err = db.PrepareContext(ctx, deleteSession); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteSession: %w", err)
+	}
+	if q.getSessionStmt, err = db.PrepareContext(ctx, getSession); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSession: %w", err)
 	}
 	if q.getUserStmt, err = db.PrepareContext(ctx, getUser); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUser: %w", err)
@@ -54,11 +69,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.softDeleteUserStmt, err = db.PrepareContext(ctx, softDeleteUser); err != nil {
 		return nil, fmt.Errorf("error preparing query SoftDeleteUser: %w", err)
 	}
-	if q.updateLastLoginStmt, err = db.PrepareContext(ctx, updateLastLogin); err != nil {
-		return nil, fmt.Errorf("error preparing query UpdateLastLogin: %w", err)
-	}
 	if q.updateUserStmt, err = db.PrepareContext(ctx, updateUser); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateUser: %w", err)
+	}
+	if q.updateUserLastLoginStmt, err = db.PrepareContext(ctx, updateUserLastLogin); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateUserLastLogin: %w", err)
 	}
 	return &q, nil
 }
@@ -70,9 +85,19 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing activateUserStmt: %w", cerr)
 		}
 	}
+	if q.cleanExpiredSessionsStmt != nil {
+		if cerr := q.cleanExpiredSessionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing cleanExpiredSessionsStmt: %w", cerr)
+		}
+	}
 	if q.countUsersStmt != nil {
 		if cerr := q.countUsersStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countUsersStmt: %w", cerr)
+		}
+	}
+	if q.createSessionStmt != nil {
+		if cerr := q.createSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createSessionStmt: %w", cerr)
 		}
 	}
 	if q.createUserStmt != nil {
@@ -83,6 +108,21 @@ func (q *Queries) Close() error {
 	if q.deactivateUserStmt != nil {
 		if cerr := q.deactivateUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deactivateUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllUserSessionsStmt != nil {
+		if cerr := q.deleteAllUserSessionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllUserSessionsStmt: %w", cerr)
+		}
+	}
+	if q.deleteSessionStmt != nil {
+		if cerr := q.deleteSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteSessionStmt: %w", cerr)
+		}
+	}
+	if q.getSessionStmt != nil {
+		if cerr := q.getSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSessionStmt: %w", cerr)
 		}
 	}
 	if q.getUserStmt != nil {
@@ -115,14 +155,14 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing softDeleteUserStmt: %w", cerr)
 		}
 	}
-	if q.updateLastLoginStmt != nil {
-		if cerr := q.updateLastLoginStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing updateLastLoginStmt: %w", cerr)
-		}
-	}
 	if q.updateUserStmt != nil {
 		if cerr := q.updateUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateUserStmt: %w", cerr)
+		}
+	}
+	if q.updateUserLastLoginStmt != nil {
+		if cerr := q.updateUserLastLoginStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateUserLastLoginStmt: %w", cerr)
 		}
 	}
 	return err
@@ -162,37 +202,47 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                    DBTX
-	tx                    *sql.Tx
-	activateUserStmt      *sql.Stmt
-	countUsersStmt        *sql.Stmt
-	createUserStmt        *sql.Stmt
-	deactivateUserStmt    *sql.Stmt
-	getUserStmt           *sql.Stmt
-	getUserByEmailStmt    *sql.Stmt
-	getUserByUsernameStmt *sql.Stmt
-	hardDeleteUserStmt    *sql.Stmt
-	listUsersStmt         *sql.Stmt
-	softDeleteUserStmt    *sql.Stmt
-	updateLastLoginStmt   *sql.Stmt
-	updateUserStmt        *sql.Stmt
+	db                        DBTX
+	tx                        *sql.Tx
+	activateUserStmt          *sql.Stmt
+	cleanExpiredSessionsStmt  *sql.Stmt
+	countUsersStmt            *sql.Stmt
+	createSessionStmt         *sql.Stmt
+	createUserStmt            *sql.Stmt
+	deactivateUserStmt        *sql.Stmt
+	deleteAllUserSessionsStmt *sql.Stmt
+	deleteSessionStmt         *sql.Stmt
+	getSessionStmt            *sql.Stmt
+	getUserStmt               *sql.Stmt
+	getUserByEmailStmt        *sql.Stmt
+	getUserByUsernameStmt     *sql.Stmt
+	hardDeleteUserStmt        *sql.Stmt
+	listUsersStmt             *sql.Stmt
+	softDeleteUserStmt        *sql.Stmt
+	updateUserStmt            *sql.Stmt
+	updateUserLastLoginStmt   *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                    tx,
-		tx:                    tx,
-		activateUserStmt:      q.activateUserStmt,
-		countUsersStmt:        q.countUsersStmt,
-		createUserStmt:        q.createUserStmt,
-		deactivateUserStmt:    q.deactivateUserStmt,
-		getUserStmt:           q.getUserStmt,
-		getUserByEmailStmt:    q.getUserByEmailStmt,
-		getUserByUsernameStmt: q.getUserByUsernameStmt,
-		hardDeleteUserStmt:    q.hardDeleteUserStmt,
-		listUsersStmt:         q.listUsersStmt,
-		softDeleteUserStmt:    q.softDeleteUserStmt,
-		updateLastLoginStmt:   q.updateLastLoginStmt,
-		updateUserStmt:        q.updateUserStmt,
+		db:                        tx,
+		tx:                        tx,
+		activateUserStmt:          q.activateUserStmt,
+		cleanExpiredSessionsStmt:  q.cleanExpiredSessionsStmt,
+		countUsersStmt:            q.countUsersStmt,
+		createSessionStmt:         q.createSessionStmt,
+		createUserStmt:            q.createUserStmt,
+		deactivateUserStmt:        q.deactivateUserStmt,
+		deleteAllUserSessionsStmt: q.deleteAllUserSessionsStmt,
+		deleteSessionStmt:         q.deleteSessionStmt,
+		getSessionStmt:            q.getSessionStmt,
+		getUserStmt:               q.getUserStmt,
+		getUserByEmailStmt:        q.getUserByEmailStmt,
+		getUserByUsernameStmt:     q.getUserByUsernameStmt,
+		hardDeleteUserStmt:        q.hardDeleteUserStmt,
+		listUsersStmt:             q.listUsersStmt,
+		softDeleteUserStmt:        q.softDeleteUserStmt,
+		updateUserStmt:            q.updateUserStmt,
+		updateUserLastLoginStmt:   q.updateUserLastLoginStmt,
 	}
 }

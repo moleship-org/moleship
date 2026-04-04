@@ -26,5 +26,5 @@ END;
 -- +goose StatementEnd
 
 -- +goose Down
-DROP TRIGGER IF EXISTS tr_users_updated_at;
+DROP TRIGGER tr_users_updated_at;
 DROP TABLE users;

@@ -12,7 +12,7 @@ import (
 
 var cmd = &cobra.Command{
 	Use:   "serve",
-	Short: "serve starts a new moleship application server",
+	Short: "serve starts the Moleship server to listen and serve API requests",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fEnvFile, err := cmd.Flags().GetString("env-file")
 		if err != nil {

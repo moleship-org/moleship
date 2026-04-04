@@ -6,23 +6,28 @@ package db
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 type Querier interface {
-	ActivateUser(ctx context.Context, id uuid.UUID) error
+	ActivateUser(ctx context.Context, id []byte) error
+	// Esto lo puedes correr en un ticker de Go cada 1 hora
+	CleanExpiredSessions(ctx context.Context) error
 	CountUsers(ctx context.Context) (int64, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) error
-	DeactivateUser(ctx context.Context, id uuid.UUID) error
-	GetUser(ctx context.Context, id uuid.UUID) (User, error)
+	DeactivateUser(ctx context.Context, id []byte) error
+	// Útil cuando un usuario cambia su password o es desactivado
+	DeleteAllUserSessions(ctx context.Context, userID []byte) error
+	DeleteSession(ctx context.Context, tokenHash []byte) error
+	GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error)
+	GetUser(ctx context.Context, id []byte) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
-	HardDeleteUser(ctx context.Context, id uuid.UUID) error
-	ListUsers(ctx context.Context) ([]User, error)
-	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
-	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
+	HardDeleteUser(ctx context.Context, id []byte) error
+	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	SoftDeleteUser(ctx context.Context, id []byte) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) error
+	UpdateUserLastLogin(ctx context.Context, id []byte) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -4,21 +4,26 @@
 
 package db
 
-import (
-	"github.com/google/uuid"
-)
+type Session struct {
+	TokenHash []byte  `json:"token_hash"`
+	UserID    []byte  `json:"user_id"`
+	IpAddress *string `json:"ip_address"`
+	UserAgent *string `json:"user_agent"`
+	ExpiresAt string  `json:"expires_at"`
+	CreatedAt string  `json:"created_at"`
+}
 
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
-	FirstName    *string   `json:"first_name"`
-	LastName     *string   `json:"last_name"`
-	PasswordHash string    `json:"password_hash"`
-	Email        string    `json:"email"`
-	IsAdmin      bool      `json:"is_admin"`
-	IsActive     bool      `json:"is_active"`
-	LastLogin    *string   `json:"last_login"`
-	CreatedAt    string    `json:"created_at"`
-	UpdatedAt    string    `json:"updated_at"`
-	DeletedAt    *string   `json:"deleted_at"`
+	ID           []byte  `json:"id"`
+	Username     string  `json:"username"`
+	FirstName    *string `json:"first_name"`
+	LastName     *string `json:"last_name"`
+	PasswordHash string  `json:"password_hash"`
+	Email        string  `json:"email"`
+	IsAdmin      bool    `json:"is_admin"`
+	IsActive     bool    `json:"is_active"`
+	LastLogin    *string `json:"last_login"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
+	DeletedAt    *string `json:"deleted_at"`
 }

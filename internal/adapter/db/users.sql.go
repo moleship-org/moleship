@@ -7,8 +7,6 @@ package db
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 const activateUser = `-- name: ActivateUser :exec
@@ -17,7 +15,7 @@ SET is_active = 1
 WHERE id = ?
 `
 
-func (q *Queries) ActivateUser(ctx context.Context, id uuid.UUID) error {
+func (q *Queries) ActivateUser(ctx context.Context, id []byte) error {
 	_, err := q.exec(ctx, q.activateUserStmt, activateUser, id)
 	return err
 }
@@ -35,24 +33,28 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 
 const createUser = `-- name: CreateUser :exec
 INSERT INTO users (
-    id, username, password_hash, email, is_admin
+    id, username, first_name, last_name, password_hash, email, is_admin
 ) VALUES (
-    ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?
 )
 `
 
 type CreateUserParams struct {
-	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
-	PasswordHash string    `json:"password_hash"`
-	Email        string    `json:"email"`
-	IsAdmin      bool      `json:"is_admin"`
+	ID           []byte  `json:"id"`
+	Username     string  `json:"username"`
+	FirstName    *string `json:"first_name"`
+	LastName     *string `json:"last_name"`
+	PasswordHash string  `json:"password_hash"`
+	Email        string  `json:"email"`
+	IsAdmin      bool    `json:"is_admin"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 	_, err := q.exec(ctx, q.createUserStmt, createUser,
 		arg.ID,
 		arg.Username,
+		arg.FirstName,
+		arg.LastName,
 		arg.PasswordHash,
 		arg.Email,
 		arg.IsAdmin,
@@ -66,7 +68,7 @@ SET is_active = 0
 WHERE id = ?
 `
 
-func (q *Queries) DeactivateUser(ctx context.Context, id uuid.UUID) error {
+func (q *Queries) DeactivateUser(ctx context.Context, id []byte) error {
 	_, err := q.exec(ctx, q.deactivateUserStmt, deactivateUser, id)
 	return err
 }
@@ -76,7 +78,7 @@ SELECT id, username, first_name, last_name, password_hash, email, is_admin, is_a
 WHERE id = ? LIMIT 1
 `
 
-func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
+func (q *Queries) GetUser(ctx context.Context, id []byte) (User, error) {
 	row := q.queryRow(ctx, q.getUserStmt, getUser, id)
 	var i User
 	err := row.Scan(
@@ -151,7 +153,7 @@ DELETE FROM users
 WHERE id = ?
 `
 
-func (q *Queries) HardDeleteUser(ctx context.Context, id uuid.UUID) error {
+func (q *Queries) HardDeleteUser(ctx context.Context, id []byte) error {
 	_, err := q.exec(ctx, q.hardDeleteUserStmt, hardDeleteUser, id)
 	return err
 }
@@ -160,10 +162,16 @@ const listUsers = `-- name: ListUsers :many
 SELECT id, username, first_name, last_name, password_hash, email, is_admin, is_active, last_login, created_at, updated_at, deleted_at FROM users
 WHERE deleted_at IS NULL
 ORDER BY created_at DESC
+LIMIT ? OFFSET ?
 `
 
-func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.query(ctx, q.listUsersStmt, listUsers)
+type ListUsersParams struct {
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
+}
+
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
+	rows, err := q.query(ctx, q.listUsersStmt, listUsers, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -205,25 +213,18 @@ SET deleted_at = datetime('now'),
 WHERE id = ?
 `
 
-func (q *Queries) SoftDeleteUser(ctx context.Context, id uuid.UUID) error {
+func (q *Queries) SoftDeleteUser(ctx context.Context, id []byte) error {
 	_, err := q.exec(ctx, q.softDeleteUserStmt, softDeleteUser, id)
-	return err
-}
-
-const updateLastLogin = `-- name: UpdateLastLogin :exec
-UPDATE users
-SET last_login = datetime('now')
-WHERE id = ?
-`
-
-func (q *Queries) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
-	_, err := q.exec(ctx, q.updateLastLoginStmt, updateLastLogin, id)
 	return err
 }
 
 const updateUser = `-- name: UpdateUser :exec
 UPDATE users
-SET username = ?,
+SET 
+    username = ?,
+    first_name = ?,
+    last_name = ?,
+    password_hash = ?,
     email = ?,
     is_admin = ?,
     is_active = ?
@@ -231,20 +232,37 @@ WHERE id = ?
 `
 
 type UpdateUserParams struct {
-	Username string    `json:"username"`
-	Email    string    `json:"email"`
-	IsAdmin  bool      `json:"is_admin"`
-	IsActive bool      `json:"is_active"`
-	ID       uuid.UUID `json:"id"`
+	Username     string  `json:"username"`
+	FirstName    *string `json:"first_name"`
+	LastName     *string `json:"last_name"`
+	PasswordHash string  `json:"password_hash"`
+	Email        string  `json:"email"`
+	IsAdmin      bool    `json:"is_admin"`
+	IsActive     bool    `json:"is_active"`
+	ID           []byte  `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 	_, err := q.exec(ctx, q.updateUserStmt, updateUser,
 		arg.Username,
+		arg.FirstName,
+		arg.LastName,
+		arg.PasswordHash,
 		arg.Email,
 		arg.IsAdmin,
 		arg.IsActive,
 		arg.ID,
 	)
+	return err
+}
+
+const updateUserLastLogin = `-- name: UpdateUserLastLogin :exec
+UPDATE users
+SET last_login = datetime('now')
+WHERE id = ?
+`
+
+func (q *Queries) UpdateUserLastLogin(ctx context.Context, id []byte) error {
+	_, err := q.exec(ctx, q.updateUserLastLoginStmt, updateUserLastLogin, id)
 	return err
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,18 +14,23 @@ import (
 	"github.com/go-chi/chi/v5"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/moleship-org/moleship/docs"
+	"github.com/moleship-org/moleship/internal/adapter/persistence"
 	"github.com/moleship-org/moleship/internal/adapter/podman"
 	"github.com/moleship-org/moleship/internal/adapter/systemd"
 	"github.com/moleship-org/moleship/internal/core/api/handler"
 	"github.com/moleship-org/moleship/internal/core/api/middleware"
 	"github.com/moleship-org/moleship/internal/core/service"
 	httpSwagger "github.com/swaggo/http-swagger"
+
+	_ "modernc.org/sqlite"
 )
 
 type Application struct {
 	cfg *Config
 
 	router chi.Router
+
+	repo persistence.Repository
 }
 
 func New(opts ...Option) *Application {
@@ -96,6 +102,10 @@ func (a *Application) Logger() *slog.Logger {
 }
 
 func (a *Application) Prepare() {
+	a.setupDatabase()
+
+	userRepo := persistence.NewUserRepository(a.repo)
+
 	systemdAdapter := systemd.New(&systemd.NewAdapterParams{
 		BindPath: a.cfg.SystemctlPath,
 		UserMode: !a.cfg.Rootful,
@@ -109,13 +119,13 @@ func (a *Application) Prepare() {
 	containerSvc := service.NewContainerService(&service.NewContainerServiceParams{
 		Systemd:    systemdAdapter,
 		Podman:     podmanAdapter,
-		QuadletDir: a.cfg.QuadletDir,
+		QuadletDir: a.cfg.QuadletHome,
 	})
 
 	quadletSvc := service.NewQuadletService(&service.NewQuadletServiceParams{
 		Systemd:    systemdAdapter,
 		Podman:     podmanAdapter,
-		QuadletDir: a.cfg.QuadletDir,
+		QuadletDir: a.cfg.QuadletHome,
 	})
 
 	a.router.Use(middleware.ContextInjector(a.Logger()))
@@ -141,6 +151,36 @@ func (a *Application) Prepare() {
 			handler.NewContainer(containerSvc).Mux(r)
 			handler.NewQuadlet(quadletSvc).Mux(r)
 			handler.NewLibpod(podmanAdapter).Mux(r)
+			handler.NewAuth(userRepo).Mux(r)
 		})
 	})
+}
+
+func (a *Application) setupDatabase() {
+	path := fmt.Sprintf("%s/moleship.db", a.cfg.DataHome)
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		a.Logger().Info("Database file not found, creating new one...")
+		file, err := os.Create(path)
+		if err != nil {
+			a.Logger().Error(fmt.Sprintf("Failed to create database file: %s", err.Error()))
+			os.Exit(1)
+		}
+		file.Close()
+	}
+
+	dbUri := fmt.Sprintf("file:%s?cache=shared&_fk=1", path)
+	conn, err := sql.Open("sqlite", dbUri)
+	if err != nil {
+		a.Logger().Error(fmt.Sprintf("Failed to open database: %s", err.Error()))
+		os.Exit(1)
+	}
+
+	err = persistence.RunMigrations(conn, "db/migrations")
+	if err != nil {
+		a.Logger().Error(fmt.Sprintf("Failed to run database migrations: %s", err.Error()))
+		os.Exit(1)
+	}
+
+	a.repo = persistence.NewSQLiteRepository(conn)
 }
