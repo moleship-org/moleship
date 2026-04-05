@@ -10,6 +10,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const SQLiteTimeLayout = "2006-01-02 15:04:05"
+
 func RunMigrations(db *sql.DB, migrationsDir string) error {
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return err

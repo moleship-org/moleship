@@ -2,11 +2,61 @@ package persistence
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/moleship-org/moleship/internal/adapter/db"
 	"github.com/moleship-org/moleship/internal/domain/model"
 )
+
+func MapUser(row *db.User) (u *model.User, err error) {
+	u = new(model.User)
+
+	id, err := uuid.ParseBytes(row.ID)
+	if err != nil {
+		return u, fmt.Errorf("error on uuid.ParseBytes of user ID: %w", err)
+	}
+	u.ID = id
+
+	u.Username = row.Username
+	u.FirstName = row.FirstName
+	u.LastName = row.LastName
+	u.PasswordHash = row.PasswordHash
+	u.Email = row.Email
+	u.IsAdmin = row.IsAdmin
+	u.IsActive = row.IsActive
+
+	if row.LastLogin != nil {
+		t, err := time.Parse(SQLiteTimeLayout, *row.LastLogin)
+		if err != nil {
+			return u, fmt.Errorf("error on time.Parse of user LastLogin: %w", err)
+		}
+		u.LastLogin = &t
+	}
+
+	t, err := time.Parse(SQLiteTimeLayout, row.CreatedAt)
+	if err != nil {
+		return u, fmt.Errorf("error on time.Parse of user CreatedAt: %w", err)
+	}
+	u.CreatedAt = t
+
+	t, err = time.Parse(SQLiteTimeLayout, row.UpdatedAt)
+	if err != nil {
+		return u, fmt.Errorf("error on time.Parse of user UpdatedAt: %w", err)
+	}
+	u.UpdatedAt = t
+
+	if row.DeletedAt != nil {
+		t, err := time.Parse(SQLiteTimeLayout, *row.DeletedAt)
+		if err != nil {
+			return u, fmt.Errorf("error on time.Parse of user DeletedAt: %w", err)
+		}
+		u.DeletedAt = &t
+	}
+
+	return u, nil
+}
 
 type UserRepository struct {
 	repo Repository
@@ -27,8 +77,10 @@ func (ur *UserRepository) FindByID(ctx context.Context, id string) (*model.User,
 		return nil, err
 	}
 
-	user := new(model.User)
-	user.Map(&row)
+	user, err := MapUser(&row)
+	if err != nil {
+		return nil, err
+	}
 
 	return user, nil
 }
@@ -39,8 +91,10 @@ func (ur *UserRepository) FindByUsername(ctx context.Context, username string) (
 		return nil, err
 	}
 
-	user := new(model.User)
-	user.Map(&row)
+	user, err := MapUser(&row)
+	if err != nil {
+		return nil, err
+	}
 
 	return user, nil
 }
@@ -51,8 +105,10 @@ func (ur *UserRepository) FindByEmail(ctx context.Context, email string) (*model
 		return nil, err
 	}
 
-	user := new(model.User)
-	user.Map(&row)
+	user, err := MapUser(&row)
+	if err != nil {
+		return nil, err
+	}
 
 	return user, nil
 }
@@ -79,8 +135,10 @@ func (ur *UserRepository) List(ctx context.Context, offset int64, limit int64) (
 
 	users := make([]*model.User, len(rows))
 	for i, row := range rows {
-		user := new(model.User)
-		user.Map(&row)
+		user, err := MapUser(&row)
+		if err != nil {
+			return nil, err
+		}
 		users[i] = user
 	}
 

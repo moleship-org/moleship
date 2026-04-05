@@ -20,17 +20,27 @@ import (
 	"github.com/moleship-org/moleship/internal/core/api/handler"
 	"github.com/moleship-org/moleship/internal/core/api/middleware"
 	"github.com/moleship-org/moleship/internal/core/service"
+	"github.com/moleship-org/moleship/internal/domain/port"
 	httpSwagger "github.com/swaggo/http-swagger"
 
 	_ "modernc.org/sqlite"
 )
 
 type Application struct {
-	cfg *Config
-
+	cfg    *Config
 	router chi.Router
 
-	repo persistence.Repository
+	// --- Services
+
+	systemdSvc   port.SystemdManager
+	podmanSvc    port.PodmanProvider
+	containerSvc port.ContainerService
+	quadletSvc   port.QuadletService
+
+	// --- Persistence
+
+	repo     persistence.Repository
+	userRepo port.UserRepository
 }
 
 func New(opts ...Option) *Application {
@@ -50,10 +60,16 @@ func (a *Application) Start(ctx context.Context) {
 	a.Prepare()
 
 	server := &http.Server{
-		Addr:         a.Addr(),
-		Handler:      a.router,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		Addr:    a.Addr(),
+		Handler: a.router,
+		// Time for the whole request to complete (headers + body)
+		ReadTimeout: 20 * time.Second,
+		// Time for reading the request headers only (helps mitigate slowloris attacks)
+		ReadHeaderTimeout: 5 * time.Second,
+		// Time for writing the response
+		WriteTimeout: 30 * time.Second,
+		// Time that an idle connection waits before closing
+		IdleTimeout: 120 * time.Second,
 	}
 
 	serverErrors := make(chan error, 1)
@@ -103,57 +119,8 @@ func (a *Application) Logger() *slog.Logger {
 
 func (a *Application) Prepare() {
 	a.setupDatabase()
-
-	userRepo := persistence.NewUserRepository(a.repo)
-
-	systemdAdapter := systemd.New(&systemd.NewAdapterParams{
-		BindPath: a.cfg.SystemctlPath,
-		UserMode: !a.cfg.Rootful,
-	})
-
-	podmanAdapter := podman.New(&podman.NewAdapterParams{
-		SocketPath: a.cfg.PodmanSocket,
-		Version:    a.cfg.PodmanVersion,
-	})
-
-	containerSvc := service.NewContainerService(&service.NewContainerServiceParams{
-		Systemd:    systemdAdapter,
-		Podman:     podmanAdapter,
-		QuadletDir: a.cfg.QuadletHome,
-	})
-
-	quadletSvc := service.NewQuadletService(&service.NewQuadletServiceParams{
-		Systemd:    systemdAdapter,
-		Podman:     podmanAdapter,
-		QuadletDir: a.cfg.QuadletHome,
-	})
-
-	a.router.Use(middleware.ContextInjector(a.Logger()))
-	a.router.Use(middleware.Logger(a.Logger()))
-	a.router.Use(chi_middleware.Recoverer)
-	a.router.Use(chi_middleware.RequestID)
-	a.router.Use(chi_middleware.RealIP)
-	a.router.Use(chi_middleware.Timeout(60 * time.Second))
-
-	if a.cfg.Mode != "production" {
-		a.router.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(docs.SwaggerInfo.SwaggerTemplate))
-		})
-
-		url := fmt.Sprintf("http://localhost:%d/swagger/doc.json", a.cfg.Port)
-		a.router.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(url)))
-	}
-
-	a.router.Route("/api", func(r chi.Router) {
-		r.Route("/v1", func(r chi.Router) {
-			handler.NewHealth().Mux(r)
-			handler.NewContainer(containerSvc).Mux(r)
-			handler.NewQuadlet(quadletSvc).Mux(r)
-			handler.NewLibpod(podmanAdapter).Mux(r)
-			handler.NewAuth(userRepo).Mux(r)
-		})
-	})
+	a.setupServices()
+	a.setupRouter()
 }
 
 func (a *Application) setupDatabase() {
@@ -183,4 +150,58 @@ func (a *Application) setupDatabase() {
 	}
 
 	a.repo = persistence.NewSQLiteRepository(conn)
+	a.userRepo = persistence.NewUserRepository(a.repo)
+}
+
+func (a *Application) setupServices() {
+	a.systemdSvc = systemd.New(&systemd.NewAdapterParams{
+		BindPath: a.cfg.SystemctlPath,
+		UserMode: !a.cfg.Rootful,
+	})
+
+	a.podmanSvc = podman.New(&podman.NewAdapterParams{
+		SocketPath: a.cfg.PodmanSocket,
+		Version:    a.cfg.PodmanVersion,
+	})
+
+	a.containerSvc = service.NewContainerService(&service.NewContainerServiceParams{
+		Systemd:    a.systemdSvc,
+		Podman:     a.podmanSvc,
+		QuadletDir: a.cfg.QuadletHome,
+	})
+
+	a.quadletSvc = service.NewQuadletService(&service.NewQuadletServiceParams{
+		Systemd:    a.systemdSvc,
+		Podman:     a.podmanSvc,
+		QuadletDir: a.cfg.QuadletHome,
+	})
+}
+
+func (a *Application) setupRouter() {
+	a.router.Use(middleware.ContextInjector(a.Logger()))
+	a.router.Use(middleware.Logger(a.Logger()))
+	a.router.Use(chi_middleware.Recoverer)
+	a.router.Use(chi_middleware.RequestID)
+	a.router.Use(chi_middleware.RealIP)
+	a.router.Use(chi_middleware.Timeout(60 * time.Second))
+
+	if a.cfg.Mode != "production" {
+		a.router.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(docs.SwaggerInfo.SwaggerTemplate))
+		})
+
+		url := fmt.Sprintf("http://localhost:%d/swagger/doc.json", a.cfg.Port)
+		a.router.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(url)))
+	}
+
+	a.router.Route("/api", func(r chi.Router) {
+		r.Route("/v1", func(r chi.Router) {
+			handler.NewHealth().Mux(r)
+			handler.NewContainer(a.containerSvc).Mux(r)
+			handler.NewQuadlet(a.quadletSvc).Mux(r)
+			handler.NewLibpod(a.podmanSvc).Mux(r)
+			handler.NewAuth(a.userRepo).Mux(r)
+		})
+	})
 }
