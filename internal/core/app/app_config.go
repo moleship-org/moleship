@@ -9,6 +9,8 @@ import (
 	"github.com/moleship-org/moleship/internal/core/env"
 )
 
+const DefaultPort = 5000
+
 type Option func(*Config)
 
 type Config struct {
@@ -42,14 +44,13 @@ func DefaultConfig() *Config {
 }
 
 func configPort(c *Config, e *env.Env) {
-
 	port, err := strconv.ParseUint(e.ServerPort, 10, 16)
 	if err != nil {
 		slog.Error("failed to parse port to uin16", "error", err)
 		os.Exit(1)
 	}
 	if port == 0 {
-		port = 6000
+		port = DefaultPort
 	}
 	c.Port = uint16(port)
 }
