@@ -6,10 +6,9 @@ INSERT INTO sessions (
 );
 
 -- name: GetSession :one
-SELECT 
+SELECT
     *
 FROM sessions s
-JOIN users u ON s.user_id = u.id
 WHERE s.token_hash = ? AND s.expires_at > datetime('now')
 LIMIT 1;
 

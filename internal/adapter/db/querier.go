@@ -19,7 +19,7 @@ type Querier interface {
 	// Útil cuando un usuario cambia su password o es desactivado
 	DeleteAllUserSessions(ctx context.Context, userID []byte) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
-	GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error)
+	GetSession(ctx context.Context, tokenHash []byte) (Session, error)
 	GetUser(ctx context.Context, id []byte) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)

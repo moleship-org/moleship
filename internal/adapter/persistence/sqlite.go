@@ -3,7 +3,6 @@ package persistence
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	"github.com/moleship-org/moleship/internal/adapter/db"
 	"github.com/pressly/goose/v3"
@@ -17,12 +16,10 @@ func RunMigrations(db *sql.DB, migrationsDir string) error {
 		return err
 	}
 
-	log.Println("Verificando migraciones de base de datos...")
 	if err := goose.Up(db, migrationsDir); err != nil {
 		return fmt.Errorf("error al ejecutar migraciones: %w", err)
 	}
 
-	log.Println("Base de datos actualizada correctamente.")
 	return nil
 }
 

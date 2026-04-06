@@ -6,7 +6,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const defaultBcryptCost = bcrypt.DefaultCost
+const DefaultBcryptCost = bcrypt.DefaultCost
 
 // PasswordManager implements the port.PasswordManager interface
 // using bcrypt for password hashing and comparison
@@ -14,9 +14,16 @@ type PasswordManager struct {
 	cost int
 }
 
+// NewDefaultPasswordManager creates a new PasswordManager with the default bcrypt cost
+func NewDefaultPasswordManager() *PasswordManager {
+	return &PasswordManager{
+		cost: DefaultBcryptCost,
+	}
+}
+
 // NewPasswordManager creates a new PasswordManager with the given cost
 func NewPasswordManager(cost int) *PasswordManager {
-	c := defaultBcryptCost
+	c := DefaultBcryptCost
 	if cost > 0 {
 		c = cost
 	}

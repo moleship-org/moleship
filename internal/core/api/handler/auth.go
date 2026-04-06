@@ -56,6 +56,7 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c.Set("token", token) // Set token in context for potential use in middleware
 	c.JSON(http.StatusOK, serializer.TokenResponse{Token: token})
 }
 
@@ -96,6 +97,7 @@ func (h *Auth) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c.Set("token", token) // Set token in context for potential use in middleware
 	c.JSON(http.StatusCreated, serializer.TokenResponse{Token: token})
 }
 
@@ -136,6 +138,7 @@ func (h *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c.Set("token", token) // Set token in context for potential use in middleware
 	c.JSON(http.StatusOK, serializer.TokenResponse{Token: token})
 }
 
@@ -170,6 +173,7 @@ func (h *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c.Set("token", nil) // Clear token from context for potential use in middleware
 	c.Status(http.StatusNoContent)
 }
 

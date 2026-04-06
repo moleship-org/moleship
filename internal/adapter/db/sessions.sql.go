@@ -71,38 +71,16 @@ func (q *Queries) DeleteSession(ctx context.Context, tokenHash []byte) error {
 }
 
 const getSession = `-- name: GetSession :one
-SELECT 
-    token_hash, user_id, ip_address, user_agent, expires_at, s.created_at, id, username, first_name, last_name, password_hash, email, is_admin, is_active, last_login, u.created_at, updated_at, deleted_at
+SELECT
+    token_hash, user_id, ip_address, user_agent, expires_at, created_at
 FROM sessions s
-JOIN users u ON s.user_id = u.id
 WHERE s.token_hash = ? AND s.expires_at > datetime('now')
 LIMIT 1
 `
 
-type GetSessionRow struct {
-	TokenHash    []byte  `json:"token_hash"`
-	UserID       []byte  `json:"user_id"`
-	IpAddress    *string `json:"ip_address"`
-	UserAgent    *string `json:"user_agent"`
-	ExpiresAt    string  `json:"expires_at"`
-	CreatedAt    string  `json:"created_at"`
-	ID           []byte  `json:"id"`
-	Username     string  `json:"username"`
-	FirstName    *string `json:"first_name"`
-	LastName     *string `json:"last_name"`
-	PasswordHash string  `json:"password_hash"`
-	Email        string  `json:"email"`
-	IsAdmin      bool    `json:"is_admin"`
-	IsActive     bool    `json:"is_active"`
-	LastLogin    *string `json:"last_login"`
-	CreatedAt_2  string  `json:"created_at_2"`
-	UpdatedAt    string  `json:"updated_at"`
-	DeletedAt    *string `json:"deleted_at"`
-}
-
-func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error) {
+func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (Session, error) {
 	row := q.queryRow(ctx, q.getSessionStmt, getSession, tokenHash)
-	var i GetSessionRow
+	var i Session
 	err := row.Scan(
 		&i.TokenHash,
 		&i.UserID,
@@ -110,18 +88,6 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionR
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.CreatedAt,
-		&i.ID,
-		&i.Username,
-		&i.FirstName,
-		&i.LastName,
-		&i.PasswordHash,
-		&i.Email,
-		&i.IsAdmin,
-		&i.IsActive,
-		&i.LastLogin,
-		&i.CreatedAt_2,
-		&i.UpdatedAt,
-		&i.DeletedAt,
 	)
 	return i, err
 }

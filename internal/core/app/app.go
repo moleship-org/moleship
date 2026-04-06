@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/moleship-org/moleship/docs"
+	"github.com/moleship-org/moleship/internal/adapter/crypto"
 	"github.com/moleship-org/moleship/internal/adapter/persistence"
 	"github.com/moleship-org/moleship/internal/adapter/podman"
 	"github.com/moleship-org/moleship/internal/adapter/systemd"
@@ -44,11 +45,14 @@ type Application struct {
 	containerSvc port.ContainerService
 	quadletSvc   port.QuadletService
 	authSvc      port.AuthService
+	passwordMan  port.PasswordManager
+	tokenGen     port.TokenGenerator
 
 	// --- Persistence
 
-	repo     persistence.Repository
-	userRepo port.UserRepository
+	repo        persistence.Repository
+	userRepo    port.UserRepository
+	sessionRepo port.SessionRepository
 }
 
 func New(opts ...Option) *Application {
@@ -159,6 +163,7 @@ func (a *Application) setupDatabase() {
 
 	a.repo = persistence.NewSQLiteRepository(conn)
 	a.userRepo = persistence.NewUserRepository(a.repo)
+	a.sessionRepo = persistence.NewSessionRepository(a.repo)
 }
 
 func (a *Application) setupServices() {
@@ -184,8 +189,14 @@ func (a *Application) setupServices() {
 		QuadletDir: a.cfg.QuadletHome,
 	})
 
+	a.passwordMan = crypto.NewDefaultPasswordManager()
+	a.tokenGen = crypto.NewTokenGenerator()
+
 	a.authSvc = service.NewAuthService(&service.AuthServiceParams{
-		UserRepo: a.userRepo,
+		UserRepo:        a.userRepo,
+		SessionRepo:     a.sessionRepo,
+		PasswordManager: a.passwordMan,
+		TokenGenerator:  a.tokenGen,
 	})
 }
 
@@ -210,10 +221,15 @@ func (a *Application) setupRouter() {
 	a.router.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
 			handler.NewHealth().Mux(r)
-			handler.NewContainer(a.containerSvc).Mux(r)
-			handler.NewQuadlet(a.quadletSvc).Mux(r)
-			handler.NewLibpod(a.podmanSvc).Mux(r)
 			handler.NewAuth(a.authSvc).Mux(r)
+
+			// Protected routes
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.Auth(a.authSvc))
+				handler.NewContainer(a.containerSvc).Mux(r)
+				handler.NewQuadlet(a.quadletSvc).Mux(r)
+				handler.NewLibpod(a.podmanSvc).Mux(r)
+			})
 		})
 	})
 }

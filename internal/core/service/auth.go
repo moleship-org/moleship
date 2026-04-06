@@ -72,7 +72,7 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 	}
 
 	// Create session and generate token
-	token, tokenHash, err := s.tokenGenerator.GenerateWithExpiry(24 * 60) // 24 hours
+	token, tokenHash, err := s.tokenGenerator.Generate()
 	if err != nil {
 		return "", fmt.Errorf("error generating token: %w", err)
 	}
@@ -127,7 +127,7 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 	}
 
 	// Create session
-	token, tokenHash, err := s.tokenGenerator.GenerateWithExpiry(24 * 60) // 24 hours
+	token, tokenHash, err := s.tokenGenerator.Generate()
 	if err != nil {
 		return "", fmt.Errorf("error generating token: %w", err)
 	}
@@ -166,7 +166,7 @@ func (s *AuthService) Refresh(ctx context.Context, token string) (string, error)
 	}
 
 	// Generate new token
-	newToken, newTokenHash, err := s.tokenGenerator.GenerateWithExpiry(24 * 60) // 24 hours
+	newToken, newTokenHash, err := s.tokenGenerator.Generate()
 	if err != nil {
 		return "", fmt.Errorf("error generating new token: %w", err)
 	}
@@ -202,4 +202,25 @@ func (s *AuthService) Logout(ctx context.Context, token string) error {
 	}
 
 	return nil
+}
+
+func (s *AuthService) ValidateToken(ctx context.Context, token string) (string, error) {
+	// Hash the provided token
+	tokenHash := sha256.Sum256([]byte(token))
+
+	// Find session by token hash
+	session, err := s.sessionRepo.FindByTokenHash(ctx, tokenHash[:])
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
+
+	// Check if session is expired
+	if time.Now().After(session.ExpiresAt) {
+		if err := s.sessionRepo.Delete(ctx, tokenHash[:]); err != nil {
+			return "", fmt.Errorf("error deleting expired session: %w", err)
+		}
+		return "", ErrInvalidToken
+	}
+
+	return session.UserID.String(), nil
 }

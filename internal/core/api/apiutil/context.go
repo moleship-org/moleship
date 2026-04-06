@@ -2,6 +2,7 @@ package apiutil
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/form"
@@ -37,6 +39,12 @@ type Context interface {
 	ContextBinder
 	ContextWriter
 
+	// Context returns the underlying request context.
+	Context() context.Context
+
+	// WithContext replaces the underlying request context with the provided one.
+	WithContext(ctx context.Context)
+
 	// Header returns the response header map for the current request.
 	Header() http.Header
 
@@ -45,6 +53,9 @@ type Context interface {
 
 	// Request returns the underlying HTTP request.
 	Request() *http.Request
+
+	// RequestHeader returns the header map from the underlying HTTP request.
+	RequestHeader() http.Header
 
 	// SetRequest overrides the underlying http request. Used on context injection.
 	SetRequest(r *http.Request)
@@ -119,6 +130,8 @@ type contextImpl struct {
 	formDecoder *form.Decoder
 
 	logger *slog.Logger
+
+	store *sync.Map
 }
 
 var _ Context = (*contextImpl)(nil)
@@ -130,11 +143,24 @@ func NewContext(writer http.ResponseWriter, request *http.Request) Context {
 	ctx.rw = writer
 	ctx.req = request
 	ctx.formDecoder = form.NewDecoder()
+	ctx.store = new(sync.Map)
 	return ctx
+}
+
+func (c *contextImpl) Context() context.Context {
+	return c.req.Context()
+}
+
+func (c *contextImpl) WithContext(ctx context.Context) {
+	c.req = c.req.WithContext(ctx)
 }
 
 func (c *contextImpl) Header() http.Header {
 	return c.rw.Header()
+}
+
+func (c *contextImpl) RequestHeader() http.Header {
+	return c.req.Header
 }
 
 func (c *contextImpl) Writer() http.ResponseWriter {
@@ -150,12 +176,14 @@ func (c *contextImpl) SetRequest(r *http.Request) {
 }
 
 func (c *contextImpl) Set(key any, val any) {
-	ctx := context.WithValue(c.req.Context(), key, val)
-	c.req = c.req.WithContext(ctx)
+	c.store.Store(key, val)
 }
 
 func (c *contextImpl) Get(key any) any {
-	return c.req.Context().Value(key)
+	if val, ok := c.store.Load(key); ok {
+		return val
+	}
+	return nil
 }
 
 func (c *contextImpl) PathValue(key string) string {
@@ -281,4 +309,12 @@ func (c *contextImpl) BindPathValues(v any) error {
 
 func (c *contextImpl) decodeMap(dest any, source url.Values) error {
 	return c.formDecoder.Decode(dest, source)
+}
+
+func DecodeBase64(encoded string) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", fmt.Errorf("error decoding base64 string: %w", err)
+	}
+	return string(decoded), nil
 }
