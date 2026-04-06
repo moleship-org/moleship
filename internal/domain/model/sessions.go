@@ -7,10 +7,10 @@ import (
 )
 
 type Session struct {
-	TokenHash []byte    `json:"token_hash"`
+	TokenHash []byte    `json:"-"`
 	UserID    uuid.UUID `json:"user_id"`
 	IPAddress *string   `json:"ip_address"`
 	UserAgent *string   `json:"user_agent"`
 	ExpiresAt time.Time `json:"expires_at"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time `json:"-"`
 }

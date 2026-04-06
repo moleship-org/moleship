@@ -125,3 +125,40 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionR
 	)
 	return i, err
 }
+
+const getUserSessions = `-- name: GetUserSessions :many
+SELECT 
+    token_hash, user_id, ip_address, user_agent, expires_at, created_at
+FROM sessions
+WHERE user_id = ? AND expires_at > datetime('now')
+`
+
+func (q *Queries) GetUserSessions(ctx context.Context, userID []byte) ([]Session, error) {
+	rows, err := q.query(ctx, q.getUserSessionsStmt, getUserSessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Session{}
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.TokenHash,
+			&i.UserID,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.ExpiresAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

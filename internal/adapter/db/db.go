@@ -60,6 +60,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getUserByUsernameStmt, err = db.PrepareContext(ctx, getUserByUsername); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByUsername: %w", err)
 	}
+	if q.getUserSessionsStmt, err = db.PrepareContext(ctx, getUserSessions); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserSessions: %w", err)
+	}
 	if q.hardDeleteUserStmt, err = db.PrepareContext(ctx, hardDeleteUser); err != nil {
 		return nil, fmt.Errorf("error preparing query HardDeleteUser: %w", err)
 	}
@@ -140,6 +143,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getUserByUsernameStmt: %w", cerr)
 		}
 	}
+	if q.getUserSessionsStmt != nil {
+		if cerr := q.getUserSessionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserSessionsStmt: %w", cerr)
+		}
+	}
 	if q.hardDeleteUserStmt != nil {
 		if cerr := q.hardDeleteUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing hardDeleteUserStmt: %w", cerr)
@@ -216,6 +224,7 @@ type Queries struct {
 	getUserStmt               *sql.Stmt
 	getUserByEmailStmt        *sql.Stmt
 	getUserByUsernameStmt     *sql.Stmt
+	getUserSessionsStmt       *sql.Stmt
 	hardDeleteUserStmt        *sql.Stmt
 	listUsersStmt             *sql.Stmt
 	softDeleteUserStmt        *sql.Stmt
@@ -239,6 +248,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getUserStmt:               q.getUserStmt,
 		getUserByEmailStmt:        q.getUserByEmailStmt,
 		getUserByUsernameStmt:     q.getUserByUsernameStmt,
+		getUserSessionsStmt:       q.getUserSessionsStmt,
 		hardDeleteUserStmt:        q.hardDeleteUserStmt,
 		listUsersStmt:             q.listUsersStmt,
 		softDeleteUserStmt:        q.softDeleteUserStmt,

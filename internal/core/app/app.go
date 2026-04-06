@@ -26,6 +26,13 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const (
+	DefaultReadTimeout       = 20 * time.Second
+	DefaultReadHeaderTimeout = 5 * time.Second
+	DefaultWriteTimeout      = 30 * time.Second
+	DefaultIdleTimeout       = 120 * time.Second
+)
+
 type Application struct {
 	cfg    *Config
 	router chi.Router
@@ -36,6 +43,7 @@ type Application struct {
 	podmanSvc    port.PodmanProvider
 	containerSvc port.ContainerService
 	quadletSvc   port.QuadletService
+	authSvc      port.AuthService
 
 	// --- Persistence
 
@@ -63,13 +71,13 @@ func (a *Application) Start(ctx context.Context) {
 		Addr:    a.Addr(),
 		Handler: a.router,
 		// Time for the whole request to complete (headers + body)
-		ReadTimeout: 20 * time.Second,
+		ReadTimeout: DefaultReadTimeout,
 		// Time for reading the request headers only (helps mitigate slowloris attacks)
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: DefaultReadHeaderTimeout,
 		// Time for writing the response
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: DefaultWriteTimeout,
 		// Time that an idle connection waits before closing
-		IdleTimeout: 120 * time.Second,
+		IdleTimeout: DefaultIdleTimeout,
 	}
 
 	serverErrors := make(chan error, 1)
@@ -175,6 +183,10 @@ func (a *Application) setupServices() {
 		Podman:     a.podmanSvc,
 		QuadletDir: a.cfg.QuadletHome,
 	})
+
+	a.authSvc = service.NewAuthService(&service.AuthServiceParams{
+		UserRepo: a.userRepo,
+	})
 }
 
 func (a *Application) setupRouter() {
@@ -201,7 +213,7 @@ func (a *Application) setupRouter() {
 			handler.NewContainer(a.containerSvc).Mux(r)
 			handler.NewQuadlet(a.quadletSvc).Mux(r)
 			handler.NewLibpod(a.podmanSvc).Mux(r)
-			handler.NewAuth(a.userRepo).Mux(r)
+			handler.NewAuth(a.authSvc).Mux(r)
 		})
 	})
 }

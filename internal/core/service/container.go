@@ -27,21 +27,21 @@ type NewContainerServiceParams struct {
 	QuadletDir string
 }
 
-type containerServiceImpl struct {
+type ContainerService struct {
 	systemd port.SystemdManager
 	podman  port.PodmanProvider
 	dir     string
 }
 
-func NewContainerService(params *NewContainerServiceParams) port.ContainerService {
-	return &containerServiceImpl{
+func NewContainerService(params *NewContainerServiceParams) *ContainerService {
+	return &ContainerService{
 		systemd: params.Systemd,
 		podman:  params.Podman,
 		dir:     params.QuadletDir,
 	}
 }
 
-func (s *containerServiceImpl) List(ctx context.Context, opts url.Values) ([]model.ContainerEntity, error) {
+func (s *ContainerService) List(ctx context.Context, opts url.Values) ([]model.ContainerEntity, error) {
 	if opts == nil {
 		opts = make(url.Values)
 	}
@@ -79,7 +79,7 @@ func (s *containerServiceImpl) List(ctx context.Context, opts url.Values) ([]mod
 	return quadlets, nil
 }
 
-func (s *containerServiceImpl) GetByID(ctx context.Context, id string) (*model.ContainerEntity, error) {
+func (s *ContainerService) GetByID(ctx context.Context, id string) (*model.ContainerEntity, error) {
 	opts := url.Values{
 		"id": {id},
 	}
@@ -97,7 +97,7 @@ func (s *containerServiceImpl) GetByID(ctx context.Context, id string) (*model.C
 	return q, nil
 }
 
-func (s *containerServiceImpl) GetByName(ctx context.Context, name string) (*model.ContainerEntity, error) {
+func (s *ContainerService) GetByName(ctx context.Context, name string) (*model.ContainerEntity, error) {
 	fileName := s.getPlainName(name) + ".container"
 	path := filepath.Join(s.dir, fileName)
 
@@ -135,22 +135,22 @@ func (s *containerServiceImpl) GetByName(ctx context.Context, name string) (*mod
 	return q, nil
 }
 
-func (s *containerServiceImpl) Start(ctx context.Context, name string) error {
+func (s *ContainerService) Start(ctx context.Context, name string) error {
 	return s.systemd.StartUnit(ctx, name+".service")
 }
 
-func (s *containerServiceImpl) Stop(ctx context.Context, name string) error {
+func (s *ContainerService) Stop(ctx context.Context, name string) error {
 	return s.systemd.StopUnit(ctx, name+".service")
 }
 
-func (s *containerServiceImpl) Restart(ctx context.Context, name string) error {
+func (s *ContainerService) Restart(ctx context.Context, name string) error {
 	if err := s.systemd.ReloadDaemon(ctx); err != nil {
 		return err
 	}
 	return s.systemd.RestartUnit(ctx, name+".service")
 }
 
-func (s *containerServiceImpl) Exists(ctx context.Context, name string) (bool, error) {
+func (s *ContainerService) Exists(ctx context.Context, name string) (bool, error) {
 	ok, err := s.podman.Exists(ctx, s.sanitizeName(name))
 	if errors.Is(err, podman.ErrContainerNotFound) {
 		return false, ErrContainertNotFound
@@ -158,7 +158,7 @@ func (s *containerServiceImpl) Exists(ctx context.Context, name string) (bool, e
 	return ok, err
 }
 
-func (s *containerServiceImpl) Stats(ctx context.Context, name string) (*model.ContainerStats, error) {
+func (s *ContainerService) Stats(ctx context.Context, name string) (*model.ContainerStats, error) {
 	report, err := s.podman.Stats(ctx, s.sanitizeName(name))
 	if errors.Is(err, podman.ErrContainerNotFound) {
 		return nil, ErrContainertNotFound
@@ -169,7 +169,7 @@ func (s *containerServiceImpl) Stats(ctx context.Context, name string) (*model.C
 	return report, nil
 }
 
-func (s *containerServiceImpl) Logs(ctx context.Context, name string, opts url.Values) (io.ReadCloser, error) {
+func (s *ContainerService) Logs(ctx context.Context, name string, opts url.Values) (io.ReadCloser, error) {
 	logs, err := s.podman.Logs(ctx, s.sanitizeName(name), opts)
 	if errors.Is(err, podman.ErrContainerNotFound) {
 		return nil, ErrContainertNotFound
@@ -180,7 +180,7 @@ func (s *containerServiceImpl) Logs(ctx context.Context, name string, opts url.V
 	return logs, nil
 }
 
-func (svc *containerServiceImpl) sanitizeName(name string) (s string) {
+func (svc *ContainerService) sanitizeName(name string) (s string) {
 	s = strings.TrimSpace(name)
 	if !strings.HasPrefix(s, "systemd-") {
 		s = "systemd-" + s
@@ -188,7 +188,7 @@ func (svc *containerServiceImpl) sanitizeName(name string) (s string) {
 	return s
 }
 
-func (svc *containerServiceImpl) getPlainName(name string) string {
+func (svc *ContainerService) getPlainName(name string) string {
 	if strings.HasPrefix(name, "systemd-") {
 		s, _ := strings.CutPrefix(name, "systemd-")
 		return s

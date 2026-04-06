@@ -23,6 +23,7 @@ type Querier interface {
 	GetUser(ctx context.Context, id []byte) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserSessions(ctx context.Context, userID []byte) ([]Session, error)
 	HardDeleteUser(ctx context.Context, id []byte) error
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	SoftDeleteUser(ctx context.Context, id []byte) error
