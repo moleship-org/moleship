@@ -4,12 +4,22 @@ import (
 	"net/http"
 
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
+	"github.com/moleship-org/moleship/internal/core/service"
 	"github.com/moleship-org/moleship/internal/domain/port"
 )
 
 func Auth(authSvc port.AuthService) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			svc, ok := authSvc.(*service.AuthService)
+			if ok {
+				if svc.IsOpen() {
+					// If open strategy, skip authentication
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
 			c := apiutil.FromRequest(w, r)
 
 			token := c.RequestHeader().Get("Authorization")
@@ -21,7 +31,7 @@ func Auth(authSvc port.AuthService) Middleware {
 			// Bearer token parsing
 			const prefix = "Bearer "
 			if len(token) <= len(prefix) || token[:len(prefix)] != prefix {
-				http.Error(w, "invalid Authorization header format", http.StatusUnauthorized)
+				http.Error(w, "invalid Authorization header format, it should be Bearer <token>", http.StatusUnauthorized)
 				return
 			}
 			token = token[len(prefix):] // Remove "Bearer " prefix

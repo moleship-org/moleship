@@ -34,7 +34,7 @@ var cmd = &cobra.Command{
 
 		a := app.New(opts...)
 		a.Logger().Info("Environment file loaded", "file", fEnvFile)
-		a.Logger().Info(fmt.Sprintf("Running on '%s' mode", strings.ToUpper(a.Config().Mode)))
+		a.Logger().Info(fmt.Sprintf("Running on '%s' mode", strings.ToUpper(a.Config().Vars.Mode)))
 
 		a.Start(context.Background())
 		return nil

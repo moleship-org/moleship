@@ -136,7 +136,7 @@ func (a *Application) Prepare() {
 }
 
 func (a *Application) setupDatabase() {
-	path := fmt.Sprintf("%s/moleship.db", a.cfg.DataHome)
+	path := fmt.Sprintf("%s/moleship.db", a.cfg.Vars.DataHome)
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		a.Logger().Info("Database file not found, creating new one...")
@@ -168,35 +168,36 @@ func (a *Application) setupDatabase() {
 
 func (a *Application) setupServices() {
 	a.systemdSvc = systemd.New(&systemd.NewAdapterParams{
-		BindPath: a.cfg.SystemctlPath,
-		UserMode: !a.cfg.Rootful,
+		BindPath: a.cfg.Vars.SystemctlPath,
+		UserMode: !a.cfg.Vars.Rootful,
 	})
 
 	a.podmanSvc = podman.New(&podman.NewAdapterParams{
-		SocketPath: a.cfg.PodmanSocket,
-		Version:    a.cfg.PodmanVersion,
+		SocketPath: a.cfg.Vars.PodmanSocket,
+		Version:    a.cfg.Vars.PodmanVersion,
 	})
 
 	a.containerSvc = service.NewContainerService(&service.NewContainerServiceParams{
 		Systemd:    a.systemdSvc,
 		Podman:     a.podmanSvc,
-		QuadletDir: a.cfg.QuadletHome,
+		QuadletDir: a.cfg.Vars.QuadletHome,
 	})
 
 	a.quadletSvc = service.NewQuadletService(&service.NewQuadletServiceParams{
 		Systemd:    a.systemdSvc,
 		Podman:     a.podmanSvc,
-		QuadletDir: a.cfg.QuadletHome,
+		QuadletDir: a.cfg.Vars.QuadletHome,
 	})
 
 	a.passwordMan = crypto.NewDefaultPasswordManager()
 	a.tokenGen = crypto.NewTokenGenerator()
 
 	a.authSvc = service.NewAuthService(&service.AuthServiceParams{
-		UserRepo:        a.userRepo,
-		SessionRepo:     a.sessionRepo,
-		PasswordManager: a.passwordMan,
-		TokenGenerator:  a.tokenGen,
+		UsersStrategyFlag: a.cfg.Vars.AuthUsersStrategy,
+		UserRepo:          a.userRepo,
+		SessionRepo:       a.sessionRepo,
+		PasswordManager:   a.passwordMan,
+		TokenGenerator:    a.tokenGen,
 	})
 }
 
@@ -208,7 +209,7 @@ func (a *Application) setupRouter() {
 	a.router.Use(chi_middleware.RealIP)
 	a.router.Use(chi_middleware.Timeout(60 * time.Second))
 
-	if a.cfg.Mode != "production" {
+	if a.cfg.Vars.Mode != "production" {
 		a.router.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(docs.SwaggerInfo.SwaggerTemplate))

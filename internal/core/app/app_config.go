@@ -14,31 +14,18 @@ const DefaultPort = 5000
 type Option func(*Config)
 
 type Config struct {
-	Mode          string
-	PodmanSocket  string
-	PodmanVersion string
-	SystemctlPath string
-	QuadletHome   string
-	DataHome      string
-	Port          uint16
-	Rootful       bool
-	Logger        *slog.Logger
+	Vars   *env.Env
+	Logger *slog.Logger
+	Port   uint16
 }
 
 func DefaultConfig() *Config {
 	e := env.MustLoad()
 	c := new(Config)
 
-	c.PodmanSocket = e.PodmanSocket
-	c.PodmanVersion = e.PodmanVersion
-	c.SystemctlPath = e.SystemctlPath
-	c.QuadletHome = e.QuadletHome
-	c.DataHome = e.DataHome
-	c.Rootful = e.Rootful
-	c.Mode = e.Mode
-
-	configPort(c, e)
+	c.Vars = e
 	configLogger(c, e)
+	configPort(c, e)
 
 	return c
 }
@@ -95,7 +82,7 @@ func WithLogger(l *slog.Logger) Option {
 func WithPodmanSocket(socket string) Option {
 	return func(c *Config) {
 		if c != nil {
-			c.PodmanSocket = socket
+			c.Vars.PodmanSocket = socket
 		}
 	}
 }
@@ -103,7 +90,7 @@ func WithPodmanSocket(socket string) Option {
 func WithQuadletHome(path string) Option {
 	return func(c *Config) {
 		if c != nil {
-			c.QuadletHome = path
+			c.Vars.QuadletHome = path
 		}
 	}
 }
@@ -111,7 +98,7 @@ func WithQuadletHome(path string) Option {
 func WithSystemctlPath(path string) Option {
 	return func(c *Config) {
 		if c != nil {
-			c.SystemctlPath = path
+			c.Vars.SystemctlPath = path
 		}
 	}
 }
@@ -119,7 +106,7 @@ func WithSystemctlPath(path string) Option {
 func WithRootful(ok bool) Option {
 	return func(c *Config) {
 		if c != nil {
-			c.Rootful = ok
+			c.Vars.Rootful = ok
 		}
 	}
 }

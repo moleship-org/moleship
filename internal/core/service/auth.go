@@ -21,30 +21,37 @@ var (
 )
 
 type AuthServiceParams struct {
-	UserRepo        port.UserRepository
-	SessionRepo     port.SessionRepository
-	PasswordManager port.PasswordManager
-	TokenGenerator  port.TokenGenerator
+	UsersStrategyFlag string
+	UserRepo          port.UserRepository
+	SessionRepo       port.SessionRepository
+	PasswordManager   port.PasswordManager
+	TokenGenerator    port.TokenGenerator
 }
 
 type AuthService struct {
-	userRepo        port.UserRepository
-	sessionRepo     port.SessionRepository
-	passwordManager port.PasswordManager
-	tokenGenerator  port.TokenGenerator
+	usersStrategyFlag string
+	userRepo          port.UserRepository
+	sessionRepo       port.SessionRepository
+	passwordManager   port.PasswordManager
+	tokenGenerator    port.TokenGenerator
 }
 
 func NewAuthService(params *AuthServiceParams) *AuthService {
 	return &AuthService{
-		userRepo:        params.UserRepo,
-		sessionRepo:     params.SessionRepo,
-		passwordManager: params.PasswordManager,
-		tokenGenerator:  params.TokenGenerator,
+		usersStrategyFlag: params.UsersStrategyFlag,
+		userRepo:          params.UserRepo,
+		sessionRepo:       params.SessionRepo,
+		passwordManager:   params.PasswordManager,
+		tokenGenerator:    params.TokenGenerator,
 	}
 }
 
 // Login authenticates a user with username and password
 func (s *AuthService) Login(ctx context.Context, username, password string) (string, error) {
+	if s.IsOpen() {
+		return "", fmt.Errorf("authentication is disabled in open strategy")
+	}
+
 	// Find user by username
 	user, err := s.userRepo.FindByUsername(ctx, username)
 	if err != nil {
@@ -93,6 +100,10 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 
 // Register creates a new user account
 func (s *AuthService) Register(ctx context.Context, username, email, password string) (string, error) {
+	if s.IsOpen() {
+		return "", fmt.Errorf("registration is disabled in open strategy")
+	}
+
 	// Check if user already exists
 	_, err := s.userRepo.FindByUsername(ctx, username)
 	if err == nil {
@@ -110,14 +121,31 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 		return "", fmt.Errorf("error hashing password: %w", err)
 	}
 
+	isAdmin := false
+	if s.usersStrategyFlag == "owner_only" {
+		// Check if there are any users in the system
+		count, err := s.userRepo.Count(ctx)
+		if err != nil {
+			return "", fmt.Errorf("error counting users: %w", err)
+		}
+
+		// If no users exist, make this user the owner (admin)
+		if count == 0 {
+			isAdmin = true
+		}
+	}
+	if !isAdmin && s.usersStrategyFlag != "multi_user" {
+		return "", fmt.Errorf("registration is disabled in '%s' strategy, an owner or admin must register new users", s.usersStrategyFlag)
+	}
+
 	// Create user
 	user := &model.User{
 		ID:           uuid.New(),
 		Username:     username,
 		Email:        email,
 		PasswordHash: passwordHash,
-		IsAdmin:      false,
-		IsActive:     true,
+		IsAdmin:      isAdmin,
+		IsActive:     isAdmin, // New users are inactive by default. The owner/admin can activate them.
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -148,6 +176,10 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 
 // Refresh generates a new token for an existing valid session
 func (s *AuthService) Refresh(ctx context.Context, token string) (string, error) {
+	if s.IsOpen() {
+		return "", fmt.Errorf("authentication is disabled in open strategy")
+	}
+
 	// Hash the provided token to look it up
 	tokenHash := sha256.Sum256([]byte(token))
 
@@ -193,6 +225,10 @@ func (s *AuthService) Refresh(ctx context.Context, token string) (string, error)
 
 // Logout invalidates a user session
 func (s *AuthService) Logout(ctx context.Context, token string) error {
+	if s.IsOpen() {
+		return fmt.Errorf("authentication is disabled in open strategy")
+	}
+
 	// Hash the provided token
 	tokenHash := sha256.Sum256([]byte(token))
 
@@ -205,6 +241,10 @@ func (s *AuthService) Logout(ctx context.Context, token string) error {
 }
 
 func (s *AuthService) ValidateToken(ctx context.Context, token string) (string, error) {
+	if s.IsOpen() {
+		return "", fmt.Errorf("authentication is disabled in open strategy")
+	}
+
 	// Hash the provided token
 	tokenHash := sha256.Sum256([]byte(token))
 
@@ -223,4 +263,8 @@ func (s *AuthService) ValidateToken(ctx context.Context, token string) (string, 
 	}
 
 	return session.UserID.String(), nil
+}
+
+func (s *AuthService) IsOpen() bool {
+	return s.usersStrategyFlag == "open"
 }

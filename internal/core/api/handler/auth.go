@@ -41,8 +41,8 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
-		c.Error(http.StatusBadRequest, "username and password are required")
+	if err := req.Validate(); err != nil {
+		c.Error(http.StatusBadRequest, "invalid login data: "+err.Error())
 		return
 	}
 
@@ -82,8 +82,8 @@ func (h *Auth) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Email == "" || req.Password == "" {
-		c.Error(http.StatusBadRequest, "username, email and password are required")
+	if err := req.Validate(); err != nil {
+		c.Error(http.StatusBadRequest, "invalid registration data: "+err.Error())
 		return
 	}
 
@@ -123,8 +123,8 @@ func (h *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Token == "" {
-		c.Error(http.StatusBadRequest, "token is required")
+	if err := req.Validate(); err != nil {
+		c.Error(http.StatusBadRequest, "invalid refresh data: "+err.Error())
 		return
 	}
 
@@ -163,8 +163,8 @@ func (h *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Token == "" {
-		c.Error(http.StatusBadRequest, "token is required")
+	if err := req.Validate(); err != nil {
+		c.Error(http.StatusBadRequest, "invalid logout data: "+err.Error())
 		return
 	}
 

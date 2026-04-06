@@ -34,6 +34,8 @@ type Env struct {
 	Rootful bool `env:"MOLESHIP_ROOTFUL_MODE,default=0"`
 
 	PodmanVersion string `env:"MOLESHIP_PODMAN_VERSION,default=5.0.0"`
+
+	AuthUsersStrategy string `env:"MOLESHIP_AUTH_USERS_STRATEGY,default=owner_only"`
 }
 
 func Load() (*Env, error) {
@@ -80,8 +82,16 @@ func Load() (*Env, error) {
 		}
 	}
 
+	if e.PodmanVersion == "" {
+		e.PodmanVersion = "5.0.0"
+	}
+
 	if e.SystemctlPath == "" {
 		e.SystemctlPath = "/usr/bin/systemctl"
+	}
+
+	if e.AuthUsersStrategy == "" {
+		e.AuthUsersStrategy = "owner_only"
 	}
 
 	return e, nil
