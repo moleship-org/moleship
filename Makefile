@@ -44,6 +44,6 @@ tidy:
 	go mod tidy
 
 run: build
-	$$(pwd)/_output/bin/$(GOOS)/$(GOARCH)/$(BIN) \
+	$$(pwd)/_output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(ARGS)
 
 .PHONY: all clean tidy run
