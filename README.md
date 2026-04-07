@@ -25,7 +25,7 @@ If you have `make` installed, run:
 
 You'll find the resulting binary in `_output/bin/{GOOS}/{GOARCH}/{BIN}`.
 
-**Import**: The build process uses [scripts/build.sh](./scripts/build.sh) and `CGO_ENABLED=1`.
+**Important**: The build process uses [scripts/build.sh](./scripts/build.sh) and `CGO_ENABLED=1`.
 
 ## Project structure
 
