@@ -2,7 +2,10 @@ package persistence
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,12 +57,20 @@ func (sr *SessionRepository) Save(ctx context.Context, session *model.Session) e
 		UserAgent: session.UserAgent,
 		ExpiresAt: session.ExpiresAt.Format(SQLiteTimeLayout),
 	})
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return model.ErrSessionExists
+		}
+	}
 	return err
 }
 
 func (sr *SessionRepository) FindByTokenHash(ctx context.Context, tokenHash []byte) (*model.Session, error) {
 	row, err := sr.repo.Querier().GetSession(ctx, tokenHash)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrSessionNotFound
+		}
 		return nil, err
 	}
 
@@ -81,6 +92,9 @@ func (sr *SessionRepository) FindByTokenHash(ctx context.Context, tokenHash []by
 func (sr *SessionRepository) FindByUserID(ctx context.Context, userID string) ([]*model.Session, error) {
 	rows, err := sr.repo.Querier().GetUserSessions(ctx, []byte(userID))
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrSessionNotFound
+		}
 		return nil, err
 	}
 

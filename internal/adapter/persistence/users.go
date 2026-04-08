@@ -2,7 +2,10 @@ package persistence
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -74,6 +77,9 @@ func (ur *UserRepository) FindByID(ctx context.Context, id string) (*model.User,
 
 	row, err := ur.repo.Querier().GetUser(ctx, []byte(id))
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrUserNotFound
+		}
 		return nil, err
 	}
 
@@ -88,6 +94,9 @@ func (ur *UserRepository) FindByID(ctx context.Context, id string) (*model.User,
 func (ur *UserRepository) FindByUsername(ctx context.Context, username string) (*model.User, error) {
 	row, err := ur.repo.Querier().GetUserByUsername(ctx, username)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrUserNotFound
+		}
 		return nil, err
 	}
 
@@ -102,6 +111,9 @@ func (ur *UserRepository) FindByUsername(ctx context.Context, username string) (
 func (ur *UserRepository) FindByEmail(ctx context.Context, email string) (*model.User, error) {
 	row, err := ur.repo.Querier().GetUserByEmail(ctx, email)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrUserNotFound
+		}
 		return nil, err
 	}
 
@@ -121,6 +133,12 @@ func (ur *UserRepository) Save(ctx context.Context, user *model.User) error {
 		Email:        user.Email,
 		IsAdmin:      user.IsAdmin,
 	})
+
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return model.ErrUserExists
+		}
+	}
 	return err
 }
 
@@ -130,6 +148,9 @@ func (ur *UserRepository) List(ctx context.Context, offset int64, limit int64) (
 		Limit:  limit,
 	})
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, model.ErrUsersNotFound
+		}
 		return nil, err
 	}
 

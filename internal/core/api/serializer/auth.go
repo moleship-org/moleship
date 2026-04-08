@@ -6,6 +6,13 @@ import (
 	"strings"
 )
 
+var (
+	ErrEmptyPassword = fmt.Errorf("password must not be empty")
+	ErrShortPassword = fmt.Errorf("password must be at least 8 characters long")
+	ErrEmptyToken    = fmt.Errorf("token is required")
+	ErrInvalidToken  = fmt.Errorf("invalid token format")
+)
+
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -13,13 +20,13 @@ type LoginRequest struct {
 
 func (r *LoginRequest) Validate() error {
 	if strings.TrimSpace(r.Username) == "" {
-		return fmt.Errorf("username is required")
+		return ErrEmptyUsername
 	}
 	if strings.TrimSpace(r.Password) == "" {
-		return fmt.Errorf("password is required")
+		return ErrEmptyPassword
 	}
 	if len(r.Password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters long")
+		return ErrShortPassword
 	}
 	return nil
 }
@@ -32,19 +39,19 @@ type RegisterRequest struct {
 
 func (r *RegisterRequest) Validate() error {
 	if strings.TrimSpace(r.Username) == "" {
-		return fmt.Errorf("username is required")
+		return ErrEmptyUsername
 	}
 	if strings.TrimSpace(r.Email) == "" {
-		return fmt.Errorf("email is required")
+		return ErrEmptyEmail
 	}
 	if strings.TrimSpace(r.Password) == "" {
-		return fmt.Errorf("password is required")
+		return ErrEmptyPassword
 	}
 	if len(r.Password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters long")
+		return ErrShortPassword
 	}
 	if _, err := mail.ParseAddress(r.Email); err != nil {
-		return fmt.Errorf("invalid email format")
+		return ErrInvalidEmail
 	}
 	return nil
 }
@@ -55,7 +62,7 @@ type RefreshRequest struct {
 
 func (r *RefreshRequest) Validate() error {
 	if strings.TrimSpace(r.Token) == "" {
-		return fmt.Errorf("token is required")
+		return ErrEmptyToken
 	}
 	return nil
 }
@@ -66,7 +73,7 @@ type LogoutRequest struct {
 
 func (r *LogoutRequest) Validate() error {
 	if strings.TrimSpace(r.Token) == "" {
-		return fmt.Errorf("token is required")
+		return ErrEmptyToken
 	}
 	return nil
 }

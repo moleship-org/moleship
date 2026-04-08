@@ -8,6 +8,12 @@ import (
 	"github.com/moleship-org/moleship/internal/domain/model"
 )
 
+var (
+	ErrEmptyUsername = fmt.Errorf("username is required")
+	ErrEmptyEmail    = fmt.Errorf("email is required")
+	ErrInvalidEmail  = fmt.Errorf("invalid email format")
+)
+
 type UserResponse struct {
 	ID        string  `json:"id"`
 	Username  string  `json:"username"`
@@ -46,13 +52,13 @@ type UpdateUserRequest struct {
 
 func (r *UpdateUserRequest) Validate() error {
 	if strings.TrimSpace(r.Username) == "" {
-		return fmt.Errorf("username is required")
+		return ErrEmptyUsername
 	}
 	if strings.TrimSpace(r.Email) == "" {
-		return fmt.Errorf("email is required")
+		return ErrEmptyEmail
 	}
 	if _, err := mail.ParseAddress(r.Email); err != nil {
-		return fmt.Errorf("invalid email format")
+		return ErrInvalidEmail
 	}
 	return nil
 }
@@ -68,13 +74,13 @@ type AdminUpdateUserRequest struct {
 
 func (r *AdminUpdateUserRequest) Validate() error {
 	if strings.TrimSpace(r.Username) == "" {
-		return fmt.Errorf("username is required")
+		return ErrEmptyUsername
 	}
 	if strings.TrimSpace(r.Email) == "" {
-		return fmt.Errorf("email is required")
+		return ErrEmptyEmail
 	}
 	if _, err := mail.ParseAddress(r.Email); err != nil {
-		return fmt.Errorf("invalid email format")
+		return ErrInvalidEmail
 	}
 	return nil
 }

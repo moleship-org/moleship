@@ -1,9 +1,21 @@
 package model
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+)
+
+var (
+	ErrUserNotFound    = errors.New("user not found")
+	ErrUserInactive    = errors.New("user is inactive")
+	ErrUserIsNotAdmin  = errors.New("user is not an admin")
+	ErrUserExists      = errors.New("user already exists")
+	ErrInvalidUsername = errors.New("invalid username")
+	ErrInvalidEmail    = errors.New("invalid email address")
+	ErrInvalidPassword = errors.New("invalid password")
+	ErrUsersNotFound   = errors.New("users not found")
 )
 
 type User struct {
