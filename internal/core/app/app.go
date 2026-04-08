@@ -230,6 +230,13 @@ func (a *Application) setupRouter() {
 				handler.NewContainer(a.containerSvc).Mux(r)
 				handler.NewQuadlet(a.quadletSvc).Mux(r)
 				handler.NewLibpod(a.podmanSvc).Mux(r)
+				handler.NewUser(a.userRepo).Mux(r)
+
+				// Admin-only routes
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.AdminOnly(a.userRepo))
+					handler.NewAdmin(a.userRepo).Mux(r)
+				})
 			})
 		})
 	})
