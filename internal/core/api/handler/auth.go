@@ -3,12 +3,15 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/moleship-org/moleship/internal/core/api/apiutil"
+	"github.com/moleship-org/moleship/internal/core/api/middleware"
 	"github.com/moleship-org/moleship/internal/core/api/serializer"
 	"github.com/moleship-org/moleship/internal/core/service"
 	"github.com/moleship-org/moleship/internal/domain/port"
+	"golang.org/x/time/rate"
 )
 
 type Auth struct {
@@ -179,9 +182,21 @@ func (h *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 
 func (h *Auth) Mux(r chi.Router) {
 	r.Route("/auth", func(r chi.Router) {
-		r.Post("/login", h.Login)
-		r.Post("/register", h.Register)
-		r.Post("/refresh", h.Refresh)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RateLimitByIP(rate.Every(time.Minute), 8))
+			r.Post("/login", h.Login)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RateLimitByIP(rate.Every(time.Minute), 4))
+			r.Post("/register", h.Register)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RateLimitByIP(rate.Every(time.Minute), 16))
+			r.Post("/refresh", h.Refresh)
+		})
+
 		r.Post("/logout", h.Logout)
 	})
 }

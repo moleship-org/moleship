@@ -13,6 +13,7 @@ require (
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.6
 	golang.org/x/crypto v0.49.0
+	golang.org/x/time v0.15.0
 	gopkg.in/ini.v1 v1.67.1
 	modernc.org/sqlite v1.48.1
 )
