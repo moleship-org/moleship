@@ -18,8 +18,10 @@ var cmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := dotenv.Load(fEnvFile); err != nil {
-			return err
+		if fEnvFile != "" {
+			if err := dotenv.Load(fEnvFile); err != nil {
+				return fmt.Errorf("failed to load environment file: %w", err)
+			}
 		}
 
 		opts := make([]app.Option, 0)
@@ -28,12 +30,14 @@ var cmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if fPort != 0 && fPort != 6000 {
+		if fPort != 0 {
 			opts = append(opts, app.WithPort(fPort))
 		}
 
 		a := app.New(opts...)
-		a.Logger().Info("Environment file loaded", "file", fEnvFile)
+		if fEnvFile != "" {
+			a.Logger().Info("Environment file loaded", "file", fEnvFile)
+		}
 		a.Logger().Info(fmt.Sprintf("Running on '%s' mode", strings.ToUpper(a.Config().Vars.Mode)))
 
 		a.Start(context.Background())
@@ -42,7 +46,7 @@ var cmd = &cobra.Command{
 }
 
 func Command() *cobra.Command {
-	cmd.Flags().Uint16P("port", "p", 6000, "use to listen and serve")
-	cmd.Flags().String("env-file", ".env", "read a file of environment variables")
+	cmd.Flags().Uint16P("port", "p", 0, "use to listen and serve")
+	cmd.Flags().String("env-file", "", "read a file of environment variables")
 	return cmd
 }

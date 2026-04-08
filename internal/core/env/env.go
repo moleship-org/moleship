@@ -23,7 +23,7 @@ type Env struct {
 
 	DataHome string `env:"MOLESHIP_DATA_HOME"`
 
-	ServerPort string `env:"MOLESHIP_SERVER_PORT,default=6000"`
+	ServerPort string `env:"MOLESHIP_SERVER_PORT,default=5000"`
 
 	PodmanSocket string `env:"MOLESHIP_PODMAN_SOCKET"`
 
