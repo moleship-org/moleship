@@ -2,8 +2,11 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/moleship-org/moleship/internal/core/api/middleware"
+	"golang.org/x/time/rate"
 )
 
 // Health godoc
@@ -41,5 +44,8 @@ func (ht *Health) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ht *Health) Mux(r chi.Router) {
-	r.Handle("/health", ht)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.RateLimitByIP(rate.Every(time.Second), 60))
+		r.Handle("/health", ht)
+	})
 }
