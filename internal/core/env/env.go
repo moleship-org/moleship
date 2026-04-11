@@ -36,6 +36,8 @@ type Env struct {
 	PodmanVersion string `env:"MOLESHIP_PODMAN_VERSION,default=5.0.0"`
 
 	AuthUsersStrategy string `env:"MOLESHIP_AUTH_USERS_STRATEGY,default=owner_only"`
+
+	CORSAllowedOrigins string `env:"MOLESHIP_CORS_ALLOWED_ORIGIN,default=*"`
 }
 
 func Load() (*Env, error) {

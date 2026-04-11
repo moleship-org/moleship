@@ -204,10 +204,10 @@ func (a *Application) setupServices() {
 func (a *Application) setupRouter() {
 	a.router.Use(middleware.ContextInjector(a.Logger()))
 	a.router.Use(middleware.Logger(a.Logger()))
+	a.router.Use(middleware.CORS(a.cfg.Vars))
 	a.router.Use(chi_middleware.Recoverer)
 	a.router.Use(chi_middleware.RequestID)
 	a.router.Use(chi_middleware.RealIP)
-	a.router.Use(chi_middleware.Timeout(60 * time.Second))
 
 	if a.cfg.Vars.Mode != "production" {
 		a.router.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
