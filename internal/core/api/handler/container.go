@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -208,7 +209,7 @@ func (h *Container) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		c.Error(http.StatusInternalServerError, "internal error trying to get resources of the container")
+		c.Error(http.StatusInternalServerError, fmt.Sprintf("internal error trying to get resources of the container: %v", err))
 		return
 	}
 
@@ -243,7 +244,7 @@ func (h *Container) Logs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		c.Error(http.StatusInternalServerError, "internal error trying to get logs")
+		c.Error(http.StatusInternalServerError, fmt.Sprintf("internal error trying to get logs: %v", err))
 		return
 	}
 	defer logs.Close()
