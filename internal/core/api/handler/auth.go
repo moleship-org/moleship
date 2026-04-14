@@ -22,19 +22,6 @@ func NewAuth(authSvc port.AuthService) *Auth {
 	return &Auth{authSvc: authSvc}
 }
 
-// Login godoc
-//
-//	@Summary		Login
-//	@Description	Authenticate with username and password, returns a session token
-//	@Tags			auth
-//	@Accept			json
-//	@Produce		json
-//	@Param			body	body		serializer.LoginRequest	true	"Login credentials"
-//	@Success		200		{object}	serializer.TokenResponse	"Session token"
-//	@Failure		400		{string}	string			"Bad request"
-//	@Failure		401		{string}	string			"Invalid credentials"
-//	@Failure		500		{string}	string			"Internal server error"
-//	@Router			/auth/login [post]
 func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -63,19 +50,6 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusOK, serializer.TokenResponse{Token: token})
 }
 
-// Register godoc
-//
-//	@Summary		Register
-//	@Description	Create a new user account, returns a session token
-//	@Tags			auth
-//	@Accept			json
-//	@Produce		json
-//	@Param			body	body		serializer.RegisterRequest	true	"Registration data"
-//	@Success		201		{object}	serializer.TokenResponse	"Session token"
-//	@Failure		400		{string}	string			"Bad request"
-//	@Failure		409		{string}	string			"User already exists"
-//	@Failure		500		{string}	string			"Internal server error"
-//	@Router			/auth/register [post]
 func (h *Auth) Register(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -104,19 +78,6 @@ func (h *Auth) Register(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusCreated, serializer.TokenResponse{Token: token})
 }
 
-// Refresh godoc
-//
-//	@Summary		Refresh token
-//	@Description	Exchange a valid session token for a new one
-//	@Tags			auth
-//	@Accept			json
-//	@Produce		json
-//	@Param			body	body		serializer.RefreshRequest	true	"Current session token"
-//	@Success		200		{object}	serializer.TokenResponse	"New session token"
-//	@Failure		400		{string}	string			"Bad request"
-//	@Failure		401		{string}	string			"Invalid or expired token"
-//	@Failure		500		{string}	string			"Internal server error"
-//	@Router			/auth/refresh [post]
 func (h *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -145,18 +106,6 @@ func (h *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusOK, serializer.TokenResponse{Token: token})
 }
 
-// Logout godoc
-//
-//	@Summary		Logout
-//	@Description	Invalidate a session token
-//	@Tags			auth
-//	@Accept			json
-//	@Produce		json
-//	@Param			body	body		serializer.LogoutRequest	true	"Session token to invalidate"
-//	@Success		204		{string}	string			"No content"
-//	@Failure		400		{string}	string			"Bad request"
-//	@Failure		500		{string}	string			"Internal server error"
-//	@Router			/auth/logout [post]
 func (h *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 

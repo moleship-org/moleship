@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/moleship-org/moleship/docs"
 	"github.com/moleship-org/moleship/internal/adapter/crypto"
 	"github.com/moleship-org/moleship/internal/adapter/persistence"
 	"github.com/moleship-org/moleship/internal/adapter/podman"
@@ -22,7 +21,6 @@ import (
 	"github.com/moleship-org/moleship/internal/core/api/middleware"
 	"github.com/moleship-org/moleship/internal/core/service"
 	"github.com/moleship-org/moleship/internal/domain/port"
-	httpSwagger "github.com/swaggo/http-swagger"
 
 	_ "modernc.org/sqlite"
 )
@@ -208,16 +206,6 @@ func (a *Application) setupRouter() {
 	a.router.Use(chi_middleware.Recoverer)
 	a.router.Use(chi_middleware.RequestID)
 	a.router.Use(chi_middleware.RealIP)
-
-	if a.cfg.Vars.Mode != "production" {
-		a.router.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(docs.SwaggerInfo.SwaggerTemplate))
-		})
-
-		url := fmt.Sprintf("http://localhost:%d/swagger/doc.json", a.cfg.Port)
-		a.router.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(url)))
-	}
 
 	a.router.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {

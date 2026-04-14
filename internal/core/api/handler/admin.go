@@ -18,17 +18,6 @@ func NewAdmin(userRepo port.UserRepository) *Admin {
 	return &Admin{userRepo: userRepo}
 }
 
-// ListUsers godoc
-//
-//	@Summary		List users
-//	@Description	List all users with pagination
-//	@Tags			admin
-//	@Produce		json
-//	@Param			offset	query		int						false	"Offset"	default(0)
-//	@Param			limit	query		int						false	"Limit"		default(20)
-//	@Success		200		{object}	serializer.ListUsersResponse
-//	@Failure		500		{string}	string	"Internal server error"
-//	@Router			/admin/users [get]
 func (h *Admin) ListUsers(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -60,18 +49,6 @@ func (h *Admin) ListUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetUser godoc
-//
-//	@Summary		Get user
-//	@Description	Get a user by ID
-//	@Tags			admin
-//	@Produce		json
-//	@Param			id	path		string					true	"User ID"
-//	@Success		200	{object}	serializer.UserResponse
-//	@Failure		400	{string}	string	"Bad request"
-//	@Failure		404	{string}	string	"Not found"
-//	@Failure		500	{string}	string	"Internal server error"
-//	@Router			/admin/users/{id} [get]
 func (h *Admin) GetUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -90,20 +67,6 @@ func (h *Admin) GetUser(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusOK, serializer.NewUserResponse(user))
 }
 
-// UpdateUser godoc
-//
-//	@Summary		Update user
-//	@Description	Update a user's profile and permissions
-//	@Tags			admin
-//	@Accept			json
-//	@Produce		json
-//	@Param			id		path		string							true	"User ID"
-//	@Param			body	body		serializer.AdminUpdateUserRequest	true	"Update data"
-//	@Success		200		{object}	serializer.UserResponse
-//	@Failure		400		{string}	string	"Bad request"
-//	@Failure		404		{string}	string	"Not found"
-//	@Failure		500		{string}	string	"Internal server error"
-//	@Router			/admin/users/{id} [put]
 func (h *Admin) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -145,16 +108,6 @@ func (h *Admin) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusOK, serializer.NewUserResponse(user))
 }
 
-// ActivateUser godoc
-//
-//	@Summary		Activate user
-//	@Description	Activate a user account
-//	@Tags			admin
-//	@Param			id	path		string	true	"User ID"
-//	@Success		204	{string}	string	"No content"
-//	@Failure		400	{string}	string	"Bad request"
-//	@Failure		500	{string}	string	"Internal server error"
-//	@Router			/admin/users/{id}/activate [post]
 func (h *Admin) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -172,16 +125,6 @@ func (h *Admin) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	c.Status(http.StatusNoContent)
 }
 
-// DeactivateUser godoc
-//
-//	@Summary		Deactivate user
-//	@Description	Deactivate a user account
-//	@Tags			admin
-//	@Param			id	path		string	true	"User ID"
-//	@Success		204	{string}	string	"No content"
-//	@Failure		400	{string}	string	"Bad request"
-//	@Failure		500	{string}	string	"Internal server error"
-//	@Router			/admin/users/{id}/deactivate [post]
 func (h *Admin) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -199,16 +142,6 @@ func (h *Admin) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	c.Status(http.StatusNoContent)
 }
 
-// SoftDeleteUser godoc
-//
-//	@Summary		Soft delete user
-//	@Description	Soft delete a user account
-//	@Tags			admin
-//	@Param			id	path		string	true	"User ID"
-//	@Success		204	{string}	string	"No content"
-//	@Failure		400	{string}	string	"Bad request"
-//	@Failure		500	{string}	string	"Internal server error"
-//	@Router			/admin/users/{id} [delete]
 func (h *Admin) SoftDeleteUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -226,16 +159,6 @@ func (h *Admin) SoftDeleteUser(w http.ResponseWriter, r *http.Request) {
 	c.Status(http.StatusNoContent)
 }
 
-// HardDeleteUser godoc
-//
-//	@Summary		Hard delete user
-//	@Description	Permanently delete a user account
-//	@Tags			admin
-//	@Param			id	path		string	true	"User ID"
-//	@Success		204	{string}	string	"No content"
-//	@Failure		400	{string}	string	"Bad request"
-//	@Failure		500	{string}	string	"Internal server error"
-//	@Router			/admin/users/{id}/hard [delete]
 func (h *Admin) HardDeleteUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 

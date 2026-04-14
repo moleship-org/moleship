@@ -40,10 +40,6 @@ You'll find the resulting binary in `_output/bin/{GOOS}/{GOARCH}/{BIN}`.
 
 ## Docs
 
-### Swaggger
-
-    swag init -g cmd/moleship/main.go -d ./ --parseDependency --parseInternal
-
 ### Godoc
 
     go doc -http

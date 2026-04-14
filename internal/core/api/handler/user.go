@@ -17,17 +17,6 @@ func NewUser(userRepo port.UserRepository) *User {
 	return &User{userRepo: userRepo}
 }
 
-// GetMe godoc
-//
-//	@Summary		Get current user
-//	@Description	Get the profile of the authenticated user
-//	@Tags			users
-//	@Produce		json
-//	@Success		200	{object}	serializer.UserResponse
-//	@Failure		401	{string}	string	"Unauthorized"
-//	@Failure		404	{string}	string	"Not found"
-//	@Failure		500	{string}	string	"Internal server error"
-//	@Router			/users/me [get]
 func (h *User) GetMe(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -46,20 +35,6 @@ func (h *User) GetMe(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusOK, serializer.NewUserResponse(user))
 }
 
-// UpdateMe godoc
-//
-//	@Summary		Update current user
-//	@Description	Update the profile of the authenticated user
-//	@Tags			users
-//	@Accept			json
-//	@Produce		json
-//	@Param			body	body		serializer.UpdateUserRequest	true	"Update data"
-//	@Success		200		{object}	serializer.UserResponse
-//	@Failure		400		{string}	string	"Bad request"
-//	@Failure		401		{string}	string	"Unauthorized"
-//	@Failure		404		{string}	string	"Not found"
-//	@Failure		500		{string}	string	"Internal server error"
-//	@Router			/users/me [put]
 func (h *User) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 

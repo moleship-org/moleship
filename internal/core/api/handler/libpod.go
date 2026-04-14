@@ -22,16 +22,6 @@ func NewLibpod(s port.PodmanProvider) *Libpod {
 	}
 }
 
-// Libpod godoc
-//
-//	@Summary		Proxy to Podman API
-//	@Description	Proxies requests to the Podman API
-//	@Tags			libpod
-//	@Accept			json
-//	@Produce		json
-//	@Param			path	path	string	true	"API path"
-//	@Success		200
-//	@Router			/libpod/{path} [get]
 func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.FromRequest(w, r)
 	path := ctx.PathValue("*")

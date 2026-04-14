@@ -22,15 +22,6 @@ func NewQuadlet(s port.QuadletService) *Quadlet {
 	}
 }
 
-// List godoc
-//
-//	@Summary		List quadlets
-//	@Description	Get all quadlet files
-//	@Tags			quadlets
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	serializer.ListQuadlets
-//	@Router			/quadlets [get]
 func (h *Quadlet) List(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -44,18 +35,6 @@ func (h *Quadlet) List(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusOK, v)
 }
 
-// GetByName godoc
-//
-//	@Summary		Get quadlet by name
-//	@Description	Get a quadlet file by name
-//	@Tags			quadlets
-//	@Accept			json
-//	@Produce		json
-//	@Param			name	path		string	true	"Quadlet name"
-//	@Success		200		{object}	github_com_moleship-org_moleship_internal_domain_model.QuadletFile
-//	@Failure		404		{string}	string	"Not found"
-//	@Failure		500		{string}	string	"Internal server error"
-//	@Router			/quadlets/{name} [get]
 func (h *Quadlet) GetByName(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 	name := chi.URLParam(r, "name")
@@ -69,18 +48,6 @@ func (h *Quadlet) GetByName(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusOK, qf)
 }
 
-// Create godoc
-//
-//	@Summary		Create quadlet
-//	@Description	Create a new quadlet file
-//	@Tags			quadlets
-//	@Accept			json
-//	@Produce		json
-//	@Param			quadlet	body			github_com_moleship-org_moleship_internal_domain_model.QuadletFile	true	"Quadlet data"
-//	@Success		201			{object}	github_com_moleship-org_moleship_internal_domain_model.QuadletFile
-//	@Failure		400			{string}	string	"Bad request"
-//	@Failure		500			{string}	string	"Internal server error"
-//	@Router			/quadlets [post]
 func (h *Quadlet) Create(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -103,21 +70,6 @@ func (h *Quadlet) Create(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusCreated, qf)
 }
 
-// Update godoc
-//
-//	@Summary		Update quadlet
-//	@Description	Update an existing quadlet file
-//	@Tags			quadlets
-//	@Accept			json
-//	@Produce		json
-//	@Param			name		path		string	true	"Quadlet name"
-//	@Param			override	query		bool	false	"Override file"
-//	@Param			quadlet	body			github_com_moleship-org_moleship_internal_domain_model.QuadletFile	true	"Quadlet data"
-//	@Success		200			{object}	github_com_moleship-org_moleship_internal_domain_model.QuadletFile
-//	@Failure		400			{string}	string	"Bad request"
-//	@Failure		404			{string}	string	"Not found"
-//	@Failure		500			{string}	string	"Internal server error"
-//	@Router			/quadlets/{name} [patch]
 func (h *Quadlet) Update(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 	name := c.PathValue("name")
@@ -137,20 +89,6 @@ func (h *Quadlet) Update(w http.ResponseWriter, r *http.Request) {
 	c.JSON(http.StatusOK, qf)
 }
 
-// ReplaceOrCreate godoc
-//
-//	@Summary		Replace or create quadlet
-//	@Description	Replace or create a quadlet file
-//	@Tags			quadlets
-//	@Accept			json
-//	@Produce		json
-//	@Param			name	path		string				true	"Quadlet name"
-//	@Param			quadlet	body		github_com_moleship-org_moleship_internal_domain_model.QuadletFile	true	"Quadlet data"
-//	@Success		200		{object}	github_com_moleship-org_moleship_internal_domain_model.QuadletFile
-//	@Success		201		{object}	github_com_moleship-org_moleship_internal_domain_model.QuadletFile
-//	@Failure		400		{string}	string				"Bad request"
-//	@Failure		500		{string}	string				"Internal server error"
-//	@Router			/quadlets/{name} [put]
 func (h *Quadlet) ReplaceOrCreate(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 	name := chi.URLParam(r, "name")
@@ -183,18 +121,6 @@ func (h *Quadlet) ReplaceOrCreate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Delete godoc
-//
-//	@Summary		Delete quadlet
-//	@Description	Delete a quadlet file
-//	@Tags			quadlets
-//	@Accept			json
-//	@Produce		json
-//	@Param			name	path		string	true	"Quadlet name"
-//	@Success		204		{string}	string	"No content"
-//	@Failure		404		{string}	string	"Not found"
-//	@Failure		500		{string}	string	"Internal server error"
-//	@Router			/quadlets/{name} [delete]
 func (h *Quadlet) Delete(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 	name := c.PathValue("name")
