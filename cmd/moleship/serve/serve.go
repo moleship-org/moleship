@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"codeberg.org/ungo/env/dotenv"
-	"github.com/moleship-org/moleship/internal/core/app"
+	"github.com/moleship-org/moleship/internal/app"
 	"github.com/spf13/cobra"
 )
 
