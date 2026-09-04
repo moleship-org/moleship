@@ -3,6 +3,8 @@ package handler
 import (
 	"net/http"
 
+	"uuid"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/moleship-org/moleship/internal/api/apiutil"
 	"github.com/moleship-org/moleship/internal/api/serializer"
@@ -20,8 +22,8 @@ func NewUser(userRepo *persistence.UserRepository) *User {
 func (h *User) GetMe(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	userID, ok := c.Get("user_id").(string)
-	if !ok || userID == "" {
+	userID, ok := c.Get("user_id").(uuid.UUID)
+	if !ok || userID == uuid.Nil() {
 		c.Error(http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -38,8 +40,8 @@ func (h *User) GetMe(w http.ResponseWriter, r *http.Request) {
 func (h *User) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	userID, ok := c.Get("user_id").(string)
-	if !ok || userID == "" {
+	userID, ok := c.Get("user_id").(uuid.UUID)
+	if !ok || userID == uuid.Nil() {
 		c.Error(http.StatusUnauthorized, "unauthorized")
 		return
 	}

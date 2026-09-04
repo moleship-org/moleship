@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type QuadletFile struct {
+type ContainerFile struct {
 	Name      string           `json:"name"`
 	Path      string           `json:"path"`
 	Unit      UnitOptions      `json:"unit"`
@@ -14,7 +14,7 @@ type QuadletFile struct {
 	Install   InstallOptions   `json:"install"`
 }
 
-func (q *QuadletFile) String() string {
+func (q *ContainerFile) String() string {
 	var sb strings.Builder
 
 	// --- [Unit] ---

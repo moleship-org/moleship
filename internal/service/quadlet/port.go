@@ -8,19 +8,19 @@ import "context"
 // as well as reloading the systemd daemon to apply changes.
 type QuadletPort interface {
 	// List returns all quadlets files on the system.
-	List(ctx context.Context) ([]QuadletFile, error)
+	List(ctx context.Context) ([]ContainerFile, error)
 
 	// Get returns a quadlet unit file information if it exists.
-	Get(ctx context.Context, name string) (*QuadletFile, error)
+	Get(ctx context.Context, name string) (*ContainerFile, error)
 
 	// Exists checks if a quadlet file exists.
 	Exists(ctx context.Context, name string) (bool, error)
 
 	// Create creates a new quadlet file with the given name and options.
-	Create(ctx context.Context, name string, qf *QuadletFile) error
+	Create(ctx context.Context, name string, qf *ContainerFile) error
 
 	// Update updates a quadlet file options.
-	Update(ctx context.Context, override bool, name string, qf *QuadletFile) error
+	Update(ctx context.Context, override bool, name string, qf *ContainerFile) error
 
 	// Delete removes a quadlet file from the system.
 	Delete(ctx context.Context, name string) error

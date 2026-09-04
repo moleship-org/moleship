@@ -1,17 +1,16 @@
 module github.com/moleship-org/moleship
 
-go 1.26.1
+go 1.27
 
 require (
 	codeberg.org/ungo/env v0.0.0-20260328142946-76f69daf34a3
 	github.com/containers/podman/v5 v5.8.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-playground/form v3.1.4+incompatible
-	github.com/google/uuid v1.6.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.49.0
-	golang.org/x/time v0.15.0
 	gopkg.in/ini.v1 v1.67.1
 	modernc.org/sqlite v1.48.1
 )
@@ -54,6 +53,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-containerregistry v0.20.6 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -123,6 +123,7 @@ require (
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.41.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260217215200-42d3e9bedb6d // indirect

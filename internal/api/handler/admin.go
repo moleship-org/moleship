@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"uuid"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/moleship-org/moleship/internal/api/apiutil"
 	"github.com/moleship-org/moleship/internal/api/serializer"
@@ -52,9 +54,10 @@ func (h *Admin) ListUsers(w http.ResponseWriter, r *http.Request) {
 func (h *Admin) GetUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	id := c.PathValue("id")
-	if id == "" {
-		c.Error(http.StatusBadRequest, "missing user ID")
+	idStr := c.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil || id == uuid.Nil() {
+		c.Error(http.StatusBadRequest, "missing or invalid user ID")
 		return
 	}
 
@@ -70,9 +73,10 @@ func (h *Admin) GetUser(w http.ResponseWriter, r *http.Request) {
 func (h *Admin) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	id := c.PathValue("id")
-	if id == "" {
-		c.Error(http.StatusBadRequest, "missing user ID")
+	idStr := c.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil || id == uuid.Nil() {
+		c.Error(http.StatusBadRequest, "missing or invalid user ID")
 		return
 	}
 
@@ -111,9 +115,10 @@ func (h *Admin) UpdateUser(w http.ResponseWriter, r *http.Request) {
 func (h *Admin) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	id := c.PathValue("id")
-	if id == "" {
-		c.Error(http.StatusBadRequest, "missing user ID")
+	idStr := c.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil || id == uuid.Nil() {
+		c.Error(http.StatusBadRequest, "missing or invalid user ID")
 		return
 	}
 
@@ -128,9 +133,10 @@ func (h *Admin) ActivateUser(w http.ResponseWriter, r *http.Request) {
 func (h *Admin) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	id := c.PathValue("id")
-	if id == "" {
-		c.Error(http.StatusBadRequest, "missing user ID")
+	idStr := c.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil || id == uuid.Nil() {
+		c.Error(http.StatusBadRequest, "missing or invalid user ID")
 		return
 	}
 
@@ -145,9 +151,10 @@ func (h *Admin) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 func (h *Admin) SoftDeleteUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	id := c.PathValue("id")
-	if id == "" {
-		c.Error(http.StatusBadRequest, "missing user ID")
+	idStr := c.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil || id == uuid.Nil() {
+		c.Error(http.StatusBadRequest, "missing or invalid user ID")
 		return
 	}
 
@@ -162,9 +169,10 @@ func (h *Admin) SoftDeleteUser(w http.ResponseWriter, r *http.Request) {
 func (h *Admin) HardDeleteUser(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	id := c.PathValue("id")
-	if id == "" {
-		c.Error(http.StatusBadRequest, "missing user ID")
+	idStr := c.PathValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil || id == uuid.Nil() {
+		c.Error(http.StatusBadRequest, "missing or invalid user ID")
 		return
 	}
 

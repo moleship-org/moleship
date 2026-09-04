@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/moleship-org/moleship/internal/adapter/systemd"
+	"github.com/moleship-org/moleship/internal/domain/systemd"
 )
 
 func TestMain(m *testing.M) {
@@ -62,7 +62,7 @@ func handleMockSystemctl() {
 
 func TestAdapter_UnitStatus(t *testing.T) {
 	bin, _ := os.Executable()
-	adapter := systemd.New(&systemd.NewAdapterParams{
+	adapter := systemd.New(&systemd.NewSystemdParams{
 		BindPath: bin,
 		UserMode: true,
 	})
@@ -92,7 +92,7 @@ func TestAdapter_UnitStatus(t *testing.T) {
 
 func TestAdapter_StartUnit(t *testing.T) {
 	bin, _ := os.Executable()
-	adapter := systemd.New(&systemd.NewAdapterParams{
+	adapter := systemd.New(&systemd.NewSystemdParams{
 		BindPath: bin,
 		UserMode: true,
 	})

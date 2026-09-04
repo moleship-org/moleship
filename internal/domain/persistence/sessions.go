@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/moleship-org/moleship/internal/db"
+	"uuid"
+
+	"github.com/moleship-org/moleship/database/db"
 )
 
 var (
@@ -31,27 +32,19 @@ type Session struct {
 func MapSession(row *db.Session) (s *Session, err error) {
 	s = new(Session)
 
-	id, err := uuid.ParseBytes(row.UserID)
-	if err != nil {
-		return s, fmt.Errorf("error on uuid.ParseBytes of session UserID: %w", err)
-	}
-	s.UserID = id
-
+	s.UserID = row.UserID
 	s.TokenHash = row.TokenHash
 	s.IPAddress = row.IpAddress
 	s.UserAgent = row.UserAgent
 
-	t, err := time.Parse(SQLiteTimeLayout, row.ExpiresAt)
+	s.ExpiresAt, err = parseSQLiteTime(row.ExpiresAt)
 	if err != nil {
-		return s, fmt.Errorf("error on time.Parse of session ExpiresAt: %w", err)
+		return nil, err
 	}
-	s.ExpiresAt = t
-
-	t, err = time.Parse(SQLiteTimeLayout, row.CreatedAt)
+	s.CreatedAt, err = parseSQLiteTime(row.CreatedAt)
 	if err != nil {
-		return s, fmt.Errorf("error on time.Parse of session CreatedAt: %w", err)
+		return nil, err
 	}
-	s.CreatedAt = t
 
 	return s, nil
 }
@@ -67,10 +60,10 @@ func NewSessionRepository(repo Repository) *SessionRepository {
 func (sr *SessionRepository) Save(ctx context.Context, session *Session) error {
 	err := sr.repo.Querier().CreateSession(ctx, db.CreateSessionParams{
 		TokenHash: session.TokenHash,
-		UserID:    []byte(session.UserID.String()),
+		UserID:    session.UserID,
 		IpAddress: session.IPAddress,
 		UserAgent: session.UserAgent,
-		ExpiresAt: session.ExpiresAt.Format(SQLiteTimeLayout),
+		ExpiresAt: session.ExpiresAt,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
@@ -104,8 +97,8 @@ func (sr *SessionRepository) FindByTokenHash(ctx context.Context, tokenHash []by
 	return session, nil
 }
 
-func (sr *SessionRepository) FindByUserID(ctx context.Context, userID string) ([]*Session, error) {
-	rows, err := sr.repo.Querier().GetUserSessions(ctx, []byte(userID))
+func (sr *SessionRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([]*Session, error) {
+	rows, err := sr.repo.Querier().GetUserSessions(ctx, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrSessionNotFound
@@ -137,12 +130,6 @@ func (sr *SessionRepository) Delete(ctx context.Context, tokenHash []byte) error
 	return err
 }
 
-func (sr *SessionRepository) DeleteByUserID(ctx context.Context, userID string) error {
-	err := uuid.Validate(userID)
-	if err != nil {
-		return err
-	}
-
-	err = sr.repo.Querier().DeleteAllUserSessions(ctx, []byte(userID))
-	return err
+func (sr *SessionRepository) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+	return sr.repo.Querier().DeleteAllUserSessions(ctx, userID)
 }

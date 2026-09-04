@@ -46,6 +46,7 @@ func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		ctx.Header().Set("Content-Type", res.Header.Get("Content-Type"))
 		ctx.Bytes(res.StatusCode, b)
 		return
 	}
@@ -53,6 +54,7 @@ func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
 	for key, value := range res.Header {
 		ctx.Header().Set(key, strings.Join(value, ","))
 	}
+
 	ctx.Status(res.StatusCode)
 }
 

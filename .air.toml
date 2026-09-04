@@ -3,7 +3,7 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = ["serve", "-p", "5000", "--env-file", ".env"]
+  args_bin = ["serve", "-p", "5000"]
   bin = "./tmp/main"
   cmd = "go build -o ./tmp/main cmd/moleship/main.go"
   delay = 1000

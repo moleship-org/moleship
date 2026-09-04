@@ -1,6 +1,7 @@
 # Environment
 *.env*
 !.env*.example
+.tmp
 
 # Air
 tmp/

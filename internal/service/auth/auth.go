@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
+
+	"github.com/moleship-org/moleship/internal/api/authtoken"
+	"github.com/moleship-org/moleship/internal/api/cookies"
 	"github.com/moleship-org/moleship/internal/domain/crypto"
 	"github.com/moleship-org/moleship/internal/domain/persistence"
 )
@@ -65,20 +68,21 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 	}
 
 	// Update last login
-	if err := s.userRepo.UpdateLastLogin(ctx, user.ID.String()); err != nil {
+	if err := s.userRepo.UpdateLastLogin(ctx, user.ID); err != nil {
 		return "", fmt.Errorf("error updating last login: %w", err)
 	}
 
-	// Create session and generate token
-	token, tokenHash, err := s.tokenGenerator.Generate()
+	// Create a signed JWT session and persist its server-side hash.
+	token, err := authtoken.NewSignedToken(user.ID)
 	if err != nil {
 		return "", fmt.Errorf("error generating token: %w", err)
 	}
 
+	tokenHash := sha256.Sum256([]byte(token))
 	session := &persistence.Session{
-		TokenHash: tokenHash,
+		TokenHash: tokenHash[:],
 		UserID:    user.ID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		ExpiresAt: (time.Now().Add(cookies.SessionDuration)),
 		CreatedAt: time.Now(),
 	}
 
@@ -145,16 +149,17 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 		return "", fmt.Errorf("error saving user: %w", err)
 	}
 
-	// Create session
-	token, tokenHash, err := s.tokenGenerator.Generate()
+	// Create a signed JWT session
+	token, err := authtoken.NewSignedToken(user.ID)
 	if err != nil {
 		return "", fmt.Errorf("error generating token: %w", err)
 	}
 
+	tokenHash := sha256.Sum256([]byte(token))
 	session := &persistence.Session{
-		TokenHash: tokenHash,
+		TokenHash: tokenHash[:],
 		UserID:    user.ID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		ExpiresAt: (time.Now().Add(cookies.SessionDuration)),
 		CreatedAt: time.Now(),
 	}
 
@@ -171,39 +176,41 @@ func (s *AuthService) Refresh(ctx context.Context, token string) (string, error)
 		return "", fmt.Errorf("authentication is disabled in open strategy")
 	}
 
-	// Hash the provided token to look it up
-	tokenHash := sha256.Sum256([]byte(token))
+	claims, err := authtoken.ParseToken(token)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
 
-	// Find session by token hash
+	tokenHash := sha256.Sum256([]byte(token))
 	session, err := s.sessionRepo.FindByTokenHash(ctx, tokenHash[:])
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
 
-	// Check if session is expired
 	if time.Now().After(session.ExpiresAt) {
 		if err := s.sessionRepo.Delete(ctx, tokenHash[:]); err != nil {
 			return "", fmt.Errorf("error deleting expired session: %w", err)
 		}
 		return "", ErrInvalidToken
 	}
+	if claims.UserID != session.UserID {
+		return "", ErrInvalidToken
+	}
 
-	// Generate new token
-	newToken, newTokenHash, err := s.tokenGenerator.Generate()
+	newToken, err := authtoken.NewSignedToken(session.UserID)
 	if err != nil {
 		return "", fmt.Errorf("error generating new token: %w", err)
 	}
 
-	// Delete old session
 	if err := s.sessionRepo.Delete(ctx, tokenHash[:]); err != nil {
 		return "", fmt.Errorf("error deleting old session: %w", err)
 	}
 
-	// Create new session
+	newTokenHash := sha256.Sum256([]byte(newToken))
 	newSession := &persistence.Session{
-		TokenHash: newTokenHash,
+		TokenHash: newTokenHash[:],
 		UserID:    session.UserID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		ExpiresAt: time.Now().Add(cookies.SessionDuration),
 		CreatedAt: time.Now(),
 	}
 
@@ -220,10 +227,11 @@ func (s *AuthService) Logout(ctx context.Context, token string) error {
 		return fmt.Errorf("authentication is disabled in open strategy")
 	}
 
-	// Hash the provided token
-	tokenHash := sha256.Sum256([]byte(token))
+	if _, err := authtoken.ParseToken(token); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
 
-	// Delete session
+	tokenHash := sha256.Sum256([]byte(token))
 	if err := s.sessionRepo.Delete(ctx, tokenHash[:]); err != nil {
 		return fmt.Errorf("error deleting session: %w", err)
 	}
@@ -236,20 +244,24 @@ func (s *AuthService) ValidateToken(ctx context.Context, token string) (string, 
 		return "", fmt.Errorf("authentication is disabled in open strategy")
 	}
 
-	// Hash the provided token
-	tokenHash := sha256.Sum256([]byte(token))
+	claims, err := authtoken.ParseToken(token)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
 
-	// Find session by token hash
+	tokenHash := sha256.Sum256([]byte(token))
 	session, err := s.sessionRepo.FindByTokenHash(ctx, tokenHash[:])
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
 
-	// Check if session is expired
 	if time.Now().After(session.ExpiresAt) {
 		if err := s.sessionRepo.Delete(ctx, tokenHash[:]); err != nil {
 			return "", fmt.Errorf("error deleting expired session: %w", err)
 		}
+		return "", ErrInvalidToken
+	}
+	if claims.UserID != session.UserID {
 		return "", ErrInvalidToken
 	}
 

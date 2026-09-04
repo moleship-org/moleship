@@ -4,13 +4,43 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/moleship-org/moleship/internal/db"
+	"uuid"
+
+	"github.com/moleship-org/moleship/database/db"
 )
+
+func parseSQLiteTime(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+
+	layouts := []string{
+		time.DateTime,
+		time.RFC3339,
+		time.RFC3339Nano,
+		"2006-01-02 15:04:05.999999999",
+	}
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed, nil
+		}
+	}
+	return time.Time{}, errors.New("unsupported sqlite timestamp: " + value)
+}
+
+func parseNullableSQLiteTime(value *string) (*time.Time, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return nil, nil
+	}
+	parsed, err := parseSQLiteTime(*value)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
 
 var (
 	ErrUserNotFound    = errors.New("user not found")
@@ -41,12 +71,7 @@ type User struct {
 func MapUser(row *db.User) (u *User, err error) {
 	u = new(User)
 
-	id, err := uuid.ParseBytes(row.ID)
-	if err != nil {
-		return u, fmt.Errorf("error on uuid.ParseBytes of user ID: %w", err)
-	}
-	u.ID = id
-
+	u.ID = row.ID
 	u.Username = row.Username
 	u.FirstName = row.FirstName
 	u.LastName = row.LastName
@@ -55,32 +80,21 @@ func MapUser(row *db.User) (u *User, err error) {
 	u.IsAdmin = row.IsAdmin
 	u.IsActive = row.IsActive
 
-	if row.LastLogin != nil {
-		t, err := time.Parse(SQLiteTimeLayout, *row.LastLogin)
-		if err != nil {
-			return u, fmt.Errorf("error on time.Parse of user LastLogin: %w", err)
-		}
-		u.LastLogin = &t
-	}
-
-	t, err := time.Parse(SQLiteTimeLayout, row.CreatedAt)
+	u.CreatedAt, err = parseSQLiteTime(row.CreatedAt)
 	if err != nil {
-		return u, fmt.Errorf("error on time.Parse of user CreatedAt: %w", err)
+		return nil, err
 	}
-	u.CreatedAt = t
-
-	t, err = time.Parse(SQLiteTimeLayout, row.UpdatedAt)
+	u.UpdatedAt, err = parseSQLiteTime(row.UpdatedAt)
 	if err != nil {
-		return u, fmt.Errorf("error on time.Parse of user UpdatedAt: %w", err)
+		return nil, err
 	}
-	u.UpdatedAt = t
-
-	if row.DeletedAt != nil {
-		t, err := time.Parse(SQLiteTimeLayout, *row.DeletedAt)
-		if err != nil {
-			return u, fmt.Errorf("error on time.Parse of user DeletedAt: %w", err)
-		}
-		u.DeletedAt = &t
+	u.LastLogin, err = parseNullableSQLiteTime(row.LastLogin)
+	if err != nil {
+		return nil, err
+	}
+	u.DeletedAt, err = parseNullableSQLiteTime(row.DeletedAt)
+	if err != nil {
+		return nil, err
 	}
 
 	return u, nil
@@ -94,13 +108,8 @@ func NewUserRepository(repo Repository) *UserRepository {
 	return &UserRepository{repo: repo}
 }
 
-func (ur *UserRepository) FindByID(ctx context.Context, id string) (*User, error) {
-	err := uuid.Validate(id)
-	if err != nil {
-		return nil, err
-	}
-
-	row, err := ur.repo.Querier().GetUser(ctx, []byte(id))
+func (ur *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
+	row, err := ur.repo.Querier().GetUser(ctx, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserNotFound
@@ -152,7 +161,7 @@ func (ur *UserRepository) FindByEmail(ctx context.Context, email string) (*User,
 
 func (ur *UserRepository) Save(ctx context.Context, user *User) error {
 	err := ur.repo.Querier().CreateUser(ctx, db.CreateUserParams{
-		ID:           []byte(user.ID.String()),
+		ID:           user.ID,
 		Username:     user.Username,
 		PasswordHash: user.PasswordHash,
 		Email:        user.Email,
@@ -201,7 +210,7 @@ func (ur *UserRepository) Count(ctx context.Context) (int64, error) {
 
 func (ur *UserRepository) Update(ctx context.Context, user *User) error {
 	err := ur.repo.Querier().UpdateUser(ctx, db.UpdateUserParams{
-		ID:           []byte(user.ID.String()),
+		ID:           user.ID,
 		Username:     user.Username,
 		FirstName:    user.FirstName,
 		LastName:     user.LastName,
@@ -213,52 +222,22 @@ func (ur *UserRepository) Update(ctx context.Context, user *User) error {
 	return err
 }
 
-func (ur *UserRepository) UpdateLastLogin(ctx context.Context, id string) error {
-	err := uuid.Validate(id)
-	if err != nil {
-		return err
-	}
-
-	err = ur.repo.Querier().UpdateUserLastLogin(ctx, []byte(id))
-	return err
+func (ur *UserRepository) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
+	return ur.repo.Querier().UpdateUserLastLogin(ctx, id)
 }
 
-func (ur *UserRepository) Activate(ctx context.Context, id string) error {
-	err := uuid.Validate(id)
-	if err != nil {
-		return err
-	}
-
-	err = ur.repo.Querier().ActivateUser(ctx, []byte(id))
-	return err
+func (ur *UserRepository) Activate(ctx context.Context, id uuid.UUID) error {
+	return ur.repo.Querier().ActivateUser(ctx, id)
 }
 
-func (ur *UserRepository) Deactivate(ctx context.Context, id string) error {
-	err := uuid.Validate(id)
-	if err != nil {
-		return err
-	}
-
-	err = ur.repo.Querier().DeactivateUser(ctx, []byte(id))
-	return err
+func (ur *UserRepository) Deactivate(ctx context.Context, id uuid.UUID) error {
+	return ur.repo.Querier().DeactivateUser(ctx, id)
 }
 
-func (ur *UserRepository) SoftDelete(ctx context.Context, id string) error {
-	err := uuid.Validate(id)
-	if err != nil {
-		return err
-	}
-
-	err = ur.repo.Querier().SoftDeleteUser(ctx, []byte(id))
-	return err
+func (ur *UserRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	return ur.repo.Querier().SoftDeleteUser(ctx, id)
 }
 
-func (ur *UserRepository) HardDelete(ctx context.Context, id string) error {
-	err := uuid.Validate(id)
-	if err != nil {
-		return err
-	}
-
-	err = ur.repo.Querier().HardDeleteUser(ctx, []byte(id))
-	return err
+func (ur *UserRepository) HardDelete(ctx context.Context, id uuid.UUID) error {
+	return ur.repo.Querier().HardDeleteUser(ctx, id)
 }

@@ -38,7 +38,7 @@ func NewQuadletService(params *NewQuadletServiceParams) *QuadletService {
 	}
 }
 
-func (s *QuadletService) List(ctx context.Context) ([]QuadletFile, error) {
+func (s *QuadletService) List(ctx context.Context) ([]ContainerFile, error) {
 	// default: (~/.config/containers/systemd)
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {
@@ -48,7 +48,7 @@ func (s *QuadletService) List(ctx context.Context) ([]QuadletFile, error) {
 		return nil, fmt.Errorf("failed to read quadlet directory: %w", err)
 	}
 
-	var quadlets []QuadletFile
+	var quadlets []ContainerFile
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".container") {
@@ -61,7 +61,7 @@ func (s *QuadletService) List(ctx context.Context) ([]QuadletFile, error) {
 			continue
 		}
 
-		qf := new(QuadletFile)
+		qf := new(ContainerFile)
 		qf.Name = strings.TrimSuffix(entry.Name(), ".container")
 		qf.Path = filePath
 
@@ -76,7 +76,7 @@ func (s *QuadletService) List(ctx context.Context) ([]QuadletFile, error) {
 	return quadlets, nil
 }
 
-func (s *QuadletService) Get(ctx context.Context, name string) (*QuadletFile, error) {
+func (s *QuadletService) Get(ctx context.Context, name string) (*ContainerFile, error) {
 	filePath := filepath.Join(s.dir, name+".container")
 
 	iniFile, err := ini.LoadSources(ini.LoadOptions{AllowShadows: true}, filePath)
@@ -87,7 +87,7 @@ func (s *QuadletService) Get(ctx context.Context, name string) (*QuadletFile, er
 		return nil, fmt.Errorf("failed to read quadlet file: %w", err)
 	}
 
-	qf := new(QuadletFile)
+	qf := new(ContainerFile)
 	qf.Name = name
 	qf.Path = filePath
 
@@ -114,7 +114,7 @@ func (s *QuadletService) Exists(ctx context.Context, name string) (bool, error) 
 	return false, fmt.Errorf("failed to check if quadlet file exists: %w", err)
 }
 
-func (s *QuadletService) Create(ctx context.Context, name string, qf *QuadletFile) error {
+func (s *QuadletService) Create(ctx context.Context, name string, qf *ContainerFile) error {
 	filePath := filepath.Join(s.dir, name+".container")
 
 	// Check if file already exists
@@ -135,7 +135,7 @@ func (s *QuadletService) Create(ctx context.Context, name string, qf *QuadletFil
 	return s.Reload(ctx)
 }
 
-func (s *QuadletService) Update(ctx context.Context, override bool, name string, qf *QuadletFile) error {
+func (s *QuadletService) Update(ctx context.Context, override bool, name string, qf *ContainerFile) error {
 	filePath := filepath.Join(s.dir, name+".container")
 
 	// Check if file exists
@@ -149,11 +149,11 @@ func (s *QuadletService) Update(ctx context.Context, override bool, name string,
 	}
 
 	// Merge strategy: if override=false, merge configurations; if override=true, replace entirely
-	var finalQf *QuadletFile
+	var finalQf *ContainerFile
 	if override {
 		finalQf = qf
 	} else {
-		finalQf = mergeQuadletFiles(existing, qf)
+		finalQf = mergeContainerFiles(existing, qf)
 	}
 
 	// Write the updated quadlet file
@@ -164,10 +164,10 @@ func (s *QuadletService) Update(ctx context.Context, override bool, name string,
 	return s.Reload(ctx)
 }
 
-// mergeQuadletFiles performs a smart merge of two quadlet files.
+// mergeContainerFiles performs a smart merge of two quadlet files.
 // New values override existing ones for scalars; slices are merged (union).
-func mergeQuadletFiles(existing *QuadletFile, new *QuadletFile) *QuadletFile {
-	merged := &QuadletFile{
+func mergeContainerFiles(existing *ContainerFile, new *ContainerFile) *ContainerFile {
+	merged := &ContainerFile{
 		Name: existing.Name,
 		Path: existing.Path,
 	}

@@ -3,7 +3,7 @@ package auth
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 type Session struct {

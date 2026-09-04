@@ -11,7 +11,7 @@ ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 VERSION ?= main
 
 # Output directory
-OUTPUT_DIR ?= _oputput
+OUTPUT_DIR ?= _oputput/bin
 
 # Go environment
 platform = $(subst -, ,$(ARCH))
@@ -19,31 +19,31 @@ GOOS = $(word 1, $(platform))
 GOARCH = $(word 2, $(platform))
 GOPROXY ?= "https://proxy.golang.org,direct"
 
+.PHONY: all clean tidy run
+
 all:
 	@$(MAKE) build
 
-build: _output/bin/$(GOOS)/$(GOARCH)/$(BIN)
+build: $(OUTPUT_DIR)/$(GOOS)/$(GOARCH)/$(BIN)
 
-_output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
+$(OUTPUT_DIR)/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 	@echo "building: $@"
 		GOOS=$(GOOS) \
 		GOARCH=$(GOARCH) \
 		VERSION=$(VERSION) \
 		PKG=$(PKG) \
 		BIN=$(BIN) \
-		OUTPUT_DIR=$$(pwd)/_output/bin/$(GOOS)/$(GOARCH) \
+		OUTPUT_DIR=$$(pwd)/$(OUTPUT_DIR)/$(GOOS)/$(GOARCH) \
 		./scripts/build.sh
 
 build-dirs:
-	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
+	@mkdir -p $(OUTPUT_DIR)/$(GOOS)/$(GOARCH)
 
 clean:
-	@rm -rf _output
+	@rm -rf $(OUTPUT_DIR)
 
 tidy:
 	go mod tidy
 
 run: build
-	$$(pwd)/_output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(ARGS)
-
-.PHONY: all clean tidy run
+	$$(pwd)/$(OUTPUT_DIR)/$(GOOS)/$(GOARCH)/$(BIN) $(ARGS)

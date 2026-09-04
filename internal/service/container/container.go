@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/moleship-org/moleship/internal/domain/config"
 	"github.com/moleship-org/moleship/internal/domain/podman"
 	"github.com/moleship-org/moleship/internal/domain/systemd"
 )
@@ -21,22 +22,19 @@ var (
 )
 
 type NewContainerServiceParams struct {
-	Systemd    systemd.SystemdPort
-	Podman     podman.PodmanPort
-	QuadletDir string
+	Systemd systemd.SystemdPort
+	Podman  podman.PodmanPort
 }
 
 type ContainerService struct {
 	systemd systemd.SystemdPort
 	podman  podman.PodmanPort
-	dir     string
 }
 
 func NewContainerService(params *NewContainerServiceParams) *ContainerService {
 	return &ContainerService{
 		systemd: params.Systemd,
 		podman:  params.Podman,
-		dir:     params.QuadletDir,
 	}
 }
 
@@ -45,7 +43,7 @@ func (s *ContainerService) List(ctx context.Context, opts url.Values) ([]podman.
 		opts = make(url.Values)
 	}
 
-	files, err := os.ReadDir(s.dir)
+	files, err := os.ReadDir(config.Current().QuadletHome)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read quadlet directory: %w", err)
 	}
@@ -60,7 +58,7 @@ func (s *ContainerService) List(ctx context.Context, opts url.Values) ([]podman.
 		status, _ := s.systemd.UnitStatus(ctx, name+".service")
 		q := podman.ContainerEntity{
 			Name:   name,
-			Path:   filepath.Join(s.dir, f.Name()),
+			Path:   filepath.Join(config.Current().QuadletHome, f.Name()),
 			Status: status,
 		}
 
@@ -98,7 +96,7 @@ func (s *ContainerService) GetByID(ctx context.Context, id string) (*podman.Cont
 
 func (s *ContainerService) GetByName(ctx context.Context, name string) (*podman.ContainerEntity, error) {
 	fileName := s.getPlainName(name) + ".container"
-	path := filepath.Join(s.dir, fileName)
+	path := filepath.Join(config.Current().QuadletHome, fileName)
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, ErrContainertNotFound

@@ -3,6 +3,8 @@ package middleware
 import (
 	"net/http"
 
+	"uuid"
+
 	"github.com/moleship-org/moleship/internal/api/apiutil"
 	"github.com/moleship-org/moleship/internal/domain/persistence"
 )
@@ -14,8 +16,8 @@ func AdminOnly(userRepo *persistence.UserRepository) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			c := apiutil.FromRequest(w, r)
 
-			userID, ok := c.Get("user_id").(string)
-			if !ok || userID == "" {
+			userID, ok := c.Get("user_id").(uuid.UUID)
+			if !ok || userID == uuid.Nil() {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}

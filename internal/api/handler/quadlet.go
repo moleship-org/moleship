@@ -21,6 +21,17 @@ func NewQuadlet(s *quadlet.QuadletService) *Quadlet {
 	}
 }
 
+func (h *Quadlet) Mux(r chi.Router) {
+	r.Route("/quadlets", func(r chi.Router) {
+		r.Get("/", h.List)
+		r.Get("/{name}", h.GetByName)
+		r.Post("/", h.Create)
+		r.Put("/{name}", h.ReplaceOrCreate)
+		r.Patch("/{name}", h.Update)
+		r.Delete("/{name}", h.Delete)
+	})
+}
+
 func (h *Quadlet) List(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
@@ -50,7 +61,7 @@ func (h *Quadlet) GetByName(w http.ResponseWriter, r *http.Request) {
 func (h *Quadlet) Create(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 
-	var qf quadlet.QuadletFile
+	var qf quadlet.ContainerFile
 	if err := json.NewDecoder(r.Body).Decode(&qf); err != nil {
 		c.Error(http.StatusBadRequest, "invalid request body")
 		return
@@ -74,7 +85,7 @@ func (h *Quadlet) Update(w http.ResponseWriter, r *http.Request) {
 	name := c.PathValue("name")
 	override, _ := strconv.ParseBool(c.QueryParam("override"))
 
-	var qf quadlet.QuadletFile
+	var qf quadlet.ContainerFile
 	if err := json.NewDecoder(r.Body).Decode(&qf); err != nil {
 		c.Error(http.StatusBadRequest, "invalid request body")
 		return
@@ -92,7 +103,7 @@ func (h *Quadlet) ReplaceOrCreate(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.FromRequest(w, r)
 	name := chi.URLParam(r, "name")
 
-	var qf quadlet.QuadletFile
+	var qf quadlet.ContainerFile
 	if err := json.NewDecoder(r.Body).Decode(&qf); err != nil {
 		c.Error(http.StatusBadRequest, "invalid request body")
 		return
@@ -130,15 +141,4 @@ func (h *Quadlet) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c.Status(http.StatusNoContent)
-}
-
-func (h *Quadlet) Mux(r chi.Router) {
-	r.Route("/quadlets", func(r chi.Router) {
-		r.Get("/", h.List)
-		r.Get("/{name}", h.GetByName)
-		r.Post("/", h.Create)
-		r.Put("/{name}", h.ReplaceOrCreate)
-		r.Patch("/{name}", h.Update)
-		r.Delete("/{name}", h.Delete)
-	})
 }

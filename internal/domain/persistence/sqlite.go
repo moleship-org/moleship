@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/moleship-org/moleship/internal/db"
+	"github.com/moleship-org/moleship/database/db"
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
