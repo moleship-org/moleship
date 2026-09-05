@@ -140,7 +140,9 @@ func (s *Systemd) ReloadDaemon(ctx context.Context) error {
 }
 
 func classifyUnitError(stderr string, err error) error {
-	if strings.Contains(stderr, "not found") || strings.Contains(stderr, "does not exist") {
+	if strings.Contains(stderr, "not found") ||
+		strings.Contains(stderr, "does not exist") ||
+		strings.Contains(stderr, "not loaded") {
 		return ErrUnitNotFound
 	}
 	if strings.Contains(stderr, "Permission denied") || strings.Contains(stderr, "Access denied") {

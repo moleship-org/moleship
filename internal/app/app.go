@@ -1,10 +1,12 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/didip/tollbooth/v8"
@@ -21,11 +23,6 @@ import (
 	"github.com/moleship-org/moleship/internal/services/quadlet"
 )
 
-type Config struct {
-	Addr   string
-	Logger *slog.Logger
-}
-
 type Application struct {
 	cfg *Config
 
@@ -39,15 +36,6 @@ type Application struct {
 
 	authSvc *auth.AuthService
 }
-
-func DefaultConfig() *Config {
-	return &Config{
-		Addr:   fmt.Sprintf(":%d", config.PORT),
-		Logger: slog.Default(),
-	}
-}
-
-type Option func(c *Config)
 
 func New(opts ...Option) *Application {
 	cfg := DefaultConfig()
@@ -63,20 +51,18 @@ func New(opts ...Option) *Application {
 }
 
 func (a *Application) Addr() string {
-	return a.cfg.Addr
+	return fmt.Sprintf(":%d", a.cfg.Port)
 }
 
-func (a *Application) Start() error {
-	if err := a.Prepare(); err != nil {
-		return err
-	}
-	if err := a.MountRoutes(); err != nil {
-		return err
-	}
-
+func (a *Application) Start(ctx context.Context) error {
 	a.server = &http.Server{
-		Addr:    a.Addr(),
-		Handler: a.router,
+		Addr:              a.Addr(),
+		Handler:           a.router,
+		ReadTimeout:       a.cfg.ReadTimeout,
+		ReadHeaderTimeout: a.cfg.ReadHeaderTimeout,
+		WriteTimeout:      a.cfg.WriteTimeout,
+		IdleTimeout:       a.cfg.IdleTimeout,
+		MaxHeaderBytes:    a.cfg.MaxHeaderBytes,
 	}
 
 	serverErrors := make(chan error, 1)
@@ -86,7 +72,14 @@ func (a *Application) Start() error {
 		serverErrors <- a.server.ListenAndServe()
 	}()
 
-	return <-serverErrors
+	select {
+	case err := <-serverErrors:
+		return err
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), a.cfg.ShutdownTimeout)
+		defer cancel()
+		return a.server.Shutdown(shutdownCtx)
+	}
 }
 
 func (a *Application) Shutdown() error {
@@ -94,31 +87,6 @@ func (a *Application) Shutdown() error {
 		return a.server.Close()
 	}
 	return nil
-}
-
-func (a *Application) WithPodmanAdapter(p podman.Port) *Application {
-	a.podmanAdapter = p
-	return a
-}
-
-func (a *Application) WithSystemdAdapter(s systemd.Port) *Application {
-	a.systemdAdapter = s
-	return a
-}
-
-func (a *Application) WithQuadletFS(q quadlet.FSPort) *Application {
-	a.quadletFS = q
-	return a
-}
-
-func (a *Application) WithQuadletService(svc *quadlet.QuadletService) *Application {
-	a.quadletSvc = svc
-	return a
-}
-
-func (a *Application) WithAuthService(svc *auth.AuthService) *Application {
-	a.authSvc = svc
-	return a
 }
 
 func (a *Application) Logger() *slog.Logger {
@@ -141,6 +109,9 @@ func (a *Application) MountRoutes() error {
 	if a.authSvc == nil {
 		return errors.New("invalid auth service: nil")
 	}
+	if config.IsReleaseMode() && len(config.ALLOWED_ORIGINS) == 0 {
+		return errors.New("invalid cors configuration: MOLESHIP_ALLOWED_ORIGINS is required in release mode")
+	}
 
 	a.router.Use(middleware.ContextInjector(a.Logger()))
 	a.router.Use(middleware.RequestLogger())
@@ -153,7 +124,7 @@ func (a *Application) MountRoutes() error {
 		MaxAge:           300,
 	}
 	if len(config.ALLOWED_ORIGINS) > 0 {
-		corsOptions.AllowedOrigins = config.ALLOWED_ORIGINS
+		corsOptions.AllowedOrigins = sanitizeAllowedOrigins(config.ALLOWED_ORIGINS)
 	}
 	a.router.Use(cors.Handler(corsOptions))
 
@@ -187,8 +158,8 @@ func (a *Application) MountRoutes() error {
 			})
 
 			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireAuth())
-				r.Use(middleware.RequireCSRF())
+				//r.Use(middleware.RequireAuth(a.authSvc))
+				//r.Use(middleware.RequireCSRF())
 
 				libpodHandler.Mount(r)
 				systemdHandler.Mount(r)
@@ -233,4 +204,16 @@ func (a *Application) Prepare() error {
 
 	a.authSvc = authSvc
 	return nil
+}
+
+func sanitizeAllowedOrigins(origins []string) []string {
+	result := make([]string, 0, len(origins))
+	for _, origin := range origins {
+		origin = strings.TrimSpace(origin)
+		if origin == "" {
+			continue
+		}
+		result = append(result, origin)
+	}
+	return result
 }

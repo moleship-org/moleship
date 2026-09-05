@@ -50,17 +50,20 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 
 	var body loginRequest
 	if err := c.BindJSON(&body); err != nil {
+		auditFailure(c, r, "auth.login", err)
 		h.lg.Error("auth bind json error", slog.String("error", err.Error()))
 		c.Error(http.StatusBadRequest, "invalid payload")
 		return
 	}
 
 	if !h.svc.IsConfigured() {
+		auditFailure(c, r, "auth.login", auth.ErrNotConfigured, slog.String("username", body.Username))
 		c.Error(http.StatusPreconditionFailed, "instance not configured yet")
 		return
 	}
 
 	if err := h.svc.Verify(body.Username, body.Password); err != nil {
+		auditFailure(c, r, "auth.login", err, slog.String("username", body.Username))
 		if !errors.Is(err, auth.ErrInvalidCredentials) && !errors.Is(err, auth.ErrNotConfigured) {
 			h.lg.Error("auth verify error", slog.String("error", err.Error()))
 		}
@@ -73,6 +76,7 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 
 	tokenSig, err := token.SignedString(config.JWT_SECRET)
 	if err != nil {
+		auditFailure(c, r, "auth.login", err, slog.String("username", body.Username))
 		h.lg.Error("auth sign token error", slog.String("error", err.Error()))
 		c.Error(http.StatusInternalServerError, "internal error")
 		return
@@ -80,6 +84,7 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 
 	csrfToken, err := cookies.NewCSRFToken()
 	if err != nil {
+		auditFailure(c, r, "auth.login", err, slog.String("username", body.Username))
 		h.lg.Error("auth csrf generation error", slog.String("error", err.Error()))
 		c.Error(http.StatusInternalServerError, "internal error")
 		return
@@ -87,6 +92,7 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(c.Writer(), cookies.SessionCookie(tokenSig))
 	http.SetCookie(c.Writer(), cookies.CSRFCookie(csrfToken))
+	auditSuccess(c, r, "auth.login", slog.String("username", body.Username))
 	c.JSON(http.StatusOK, sessionResponse{Username: body.Username, CSRFToken: csrfToken})
 }
 
@@ -95,6 +101,7 @@ func (h *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.From(w, r)
 	http.SetCookie(c.Writer(), cookies.ExpireSessionCookie())
 	http.SetCookie(c.Writer(), cookies.ExpireCSRFCookie())
+	auditSuccess(c, r, "auth.logout")
 	c.Status(http.StatusNoContent)
 }
 

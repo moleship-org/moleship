@@ -21,6 +21,7 @@ const (
 	EnvDataHome             = "MOLESHIP_DATA_HOME"
 	EnvPodmanSocket         = "MOLESHIP_PODMAN_SOCKET"
 	EnvPodmanPath           = "MOLESHIP_PODMAN_PATH"
+	EnvEnableLibpodProxy    = "MOLESHIP_ENABLE_LIBPOD_PROXY"
 	EnvSystemctlPath        = "MOLESHIP_SYSTEMCTL_PATH"
 	EnvQuadletHome          = "MOLESHIP_QUADLET_HOME"
 	EnvJWTSecret            = "MOLESHIP_JWT_SECRET"
@@ -73,6 +74,9 @@ var (
 
 	// Default path to the Podman executable
 	PODMAN_PATH string = "/usr/bin/podman"
+
+	// Default flag indicating whether the raw libpod proxy endpoint is enabled
+	ENABLE_LIBPOD_PROXY bool = false
 
 	// Default path to the systemctl executable
 	SYSTEMCTL_PATH string = "/usr/bin/systemctl"
@@ -141,6 +145,9 @@ func init() {
 	MODE = getEnvOrDefault(EnvMode, "debug")
 	PODMAN_SOCKET = getEnvOrDefault(EnvPodmanSocket, "/run/user/1000/podman/podman.sock")
 	PODMAN_PATH = getEnvOrDefault(EnvPodmanPath, "/usr/bin/podman")
+	if enabled, err := strconv.ParseBool(getEnvOrDefault(EnvEnableLibpodProxy, "false")); err == nil {
+		ENABLE_LIBPOD_PROXY = enabled
+	}
 	SYSTEMCTL_PATH = getEnvOrDefault(EnvSystemctlPath, "/usr/bin/systemctl")
 
 	secret, err := getOrCreateJWTSecret(DATA_HOME)

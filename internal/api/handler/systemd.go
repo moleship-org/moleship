@@ -46,6 +46,7 @@ func (h *Systemd) UnitStatus(w http.ResponseWriter, r *http.Request) {
 
 	status, err := h.sys.UnitStatus(r.Context(), unit)
 	if err != nil {
+		auditFailure(ctx, r, "systemd.unit.status", err, slog.String("unit", unit))
 		writeError(ctx, err)
 		return
 	}
@@ -59,6 +60,7 @@ func (h *Systemd) UnitStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	auditSuccess(ctx, r, "systemd.unit.status", slog.String("unit", unit), slog.String("status", status))
 	ctx.JSONBlob(http.StatusOK, body)
 }
 
@@ -67,10 +69,12 @@ func (h *Systemd) StartUnit(w http.ResponseWriter, r *http.Request) {
 	unit := chi.URLParam(r, "unit")
 
 	if err := h.sys.StartUnit(r.Context(), unit); err != nil {
+		auditFailure(ctx, r, "systemd.unit.start", err, slog.String("unit", unit))
 		writeError(ctx, err)
 		return
 	}
 
+	auditSuccess(ctx, r, "systemd.unit.start", slog.String("unit", unit))
 	ctx.Status(http.StatusNoContent)
 }
 
@@ -79,10 +83,12 @@ func (h *Systemd) StopUnit(w http.ResponseWriter, r *http.Request) {
 	unit := chi.URLParam(r, "unit")
 
 	if err := h.sys.StopUnit(r.Context(), unit); err != nil {
+		auditFailure(ctx, r, "systemd.unit.stop", err, slog.String("unit", unit))
 		writeError(ctx, err)
 		return
 	}
 
+	auditSuccess(ctx, r, "systemd.unit.stop", slog.String("unit", unit))
 	ctx.Status(http.StatusNoContent)
 }
 
@@ -91,10 +97,12 @@ func (h *Systemd) RestartUnit(w http.ResponseWriter, r *http.Request) {
 	unit := chi.URLParam(r, "unit")
 
 	if err := h.sys.RestartUnit(r.Context(), unit); err != nil {
+		auditFailure(ctx, r, "systemd.unit.restart", err, slog.String("unit", unit))
 		writeError(ctx, err)
 		return
 	}
 
+	auditSuccess(ctx, r, "systemd.unit.restart", slog.String("unit", unit))
 	ctx.Status(http.StatusNoContent)
 }
 
@@ -102,10 +110,12 @@ func (h *Systemd) ReloadDaemon(w http.ResponseWriter, r *http.Request) {
 	ctx := apiutil.From(w, r)
 
 	if err := h.sys.ReloadDaemon(r.Context()); err != nil {
+		auditFailure(ctx, r, "systemd.daemon_reload", err)
 		writeError(ctx, err)
 		return
 	}
 
+	auditSuccess(ctx, r, "systemd.daemon_reload")
 	ctx.Status(http.StatusNoContent)
 }
 
@@ -120,7 +130,7 @@ func writeError(ctx apiutil.Context, err error) {
 	case errors.Is(err, systemd.ErrDaemonReloadFailed):
 		ctx.Error(http.StatusInternalServerError, "daemon-reload failed")
 	case errors.Is(err, systemd.ErrCommandFailed):
-		ctx.Error(http.StatusInternalServerError, "systemctl command failed")
+		ctx.Error(http.StatusBadGateway, "systemd command failed; check `systemctl --user status <unit>` and `journalctl --user -xeu <unit>` for details")
 	default:
 		ctx.Error(http.StatusInternalServerError, "unexpected error calling systemd")
 	}
