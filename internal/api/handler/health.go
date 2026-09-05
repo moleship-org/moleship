@@ -1,39 +1,33 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type Health struct {
-	allows string
+	lg *slog.Logger
 }
 
-func NewHealth() *Health {
+func NewHealth(lg *slog.Logger) *Health {
 	r := new(Health)
-	r.allows = "OPTIONS, GET"
+	r.lg = lg
 	return r
 }
 
-func (ht *Health) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodOptions:
-		w.Header().Set("Allow", ht.allows)
-		w.WriteHeader(http.StatusNoContent)
+func (h *Health) Mount(r chi.Router) {
+	h.lg.Info("Mounting /health endpoint")
 
-	case http.MethodGet:
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-
-	default:
-		w.Header().Set("Allow", ht.allows)
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
+	r.Group(func(r chi.Router) {
+		r.Route("/health", func(r chi.Router) {
+			r.Get("/", h.Checkhealth)
+		})
+	})
 }
 
-func (ht *Health) Mux(r chi.Router) {
-	r.Group(func(r chi.Router) {
-		r.Handle("/health", ht)
-	})
+func (h *Health) Checkhealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
 }

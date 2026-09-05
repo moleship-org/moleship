@@ -5,16 +5,13 @@ import (
 	"net/http"
 	"strings"
 
-	"uuid"
-
-	"github.com/moleship-org/moleship/internal/api/apiutil"
-	"github.com/moleship-org/moleship/internal/api/authtoken"
-	"github.com/moleship-org/moleship/internal/api/cookies"
-	"github.com/moleship-org/moleship/internal/domain/config"
-	"github.com/moleship-org/moleship/internal/service/auth"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/moleship-org/moleship/internal/config"
+	"github.com/moleship-org/moleship/internal/services/auth/authtoken"
+	"github.com/moleship-org/moleship/internal/services/auth/cookies"
 )
 
-func RequireAuth(authSvc *auth.AuthService) func(http.Handler) http.Handler {
+func RequireAuth() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var tokenString string
@@ -23,7 +20,7 @@ func RequireAuth(authSvc *auth.AuthService) func(http.Handler) http.Handler {
 			if err == nil {
 				tokenString = cookie.Value
 			} else {
-				if config.IsDebug() {
+				if config.IsDebugMode() {
 					authHeader := r.Header.Get("Authorization")
 					if strings.HasPrefix(authHeader, "Bearer ") {
 						tokenString = strings.TrimPrefix(authHeader, "Bearer ")
@@ -36,27 +33,20 @@ func RequireAuth(authSvc *auth.AuthService) func(http.Handler) http.Handler {
 				return
 			}
 
-			userIDStr, err := authSvc.ValidateToken(r.Context(), tokenString)
-			if err != nil {
-				http.Error(w, "invalid or expired token", http.StatusUnauthorized)
-				return
-			}
+			claims := &authtoken.Claims{}
+			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, http.ErrAbortHandler
+				}
+				return config.JWT_SECRET, nil
+			})
 
-			userID, err := uuid.Parse(userIDStr)
-			if err != nil {
-				http.Error(w, "invalid or expired token", http.StatusUnauthorized)
-				return
-			}
-
-			claims, err := authtoken.ParseToken(tokenString)
-			if err != nil {
+			if err != nil || !token.Valid {
 				http.Error(w, "invalid or expired token", http.StatusUnauthorized)
 				return
 			}
 
 			ctx := context.WithValue(r.Context(), authtoken.ClaimsKey, claims)
-			apiCtx := apiutil.FromRequest(w, r)
-			apiCtx.Set("user_id", userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

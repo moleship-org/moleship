@@ -3,7 +3,7 @@ package apiutil
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -22,8 +22,8 @@ const (
 	CtxKey ContextKey = iota
 )
 
-// FromRequest gets the underlying Context from r.Context()
-func FromRequest(w http.ResponseWriter, r *http.Request) Context {
+// From gets the underlying Context from r.Context()
+func From(w http.ResponseWriter, r *http.Request) Context {
 	var ctx Context
 	var ok bool
 	ctx, ok = r.Context().Value(CtxKey).(*contextImpl)
@@ -119,6 +119,9 @@ type ContextWriter interface {
 
 	// Redirect sends an HTTP redirect to the specified URL with the given status code.
 	Redirect(status int, url string) error
+
+	// Cookie writes the given cookie in the plain HTTP response
+	Cookie(status int, cookie *http.Cookie)
 }
 
 // contextImpl is the concrete implementation of Context used internally by handlers.
@@ -138,10 +141,10 @@ var _ Context = (*contextImpl)(nil)
 
 // NewContext creates a new API utility context that wraps an HTTP response writer
 // and request for use in handlers.
-func NewContext(writer http.ResponseWriter, request *http.Request) Context {
+func NewContext(w http.ResponseWriter, r *http.Request) Context {
 	ctx := new(contextImpl)
-	ctx.rw = writer
-	ctx.req = request
+	ctx.rw = w
+	ctx.req = r
 	ctx.formDecoder = form.NewDecoder()
 	ctx.store = new(sync.Map)
 	return ctx
@@ -213,8 +216,10 @@ func (c *contextImpl) Status(status int) error {
 }
 
 func (c *contextImpl) Bytes(status int, blob []byte) error {
-	c.Header().Set("Content-Type", "application/octet-stream")
-	c.Header().Set("Content-Length", strconv.Itoa(len(blob)))
+	if c.Header().Get("Content-Type") == "" {
+		c.Header().Set("Content-Type", "application/octet-stream")
+		c.Header().Set("Content-Length", strconv.Itoa(len(blob)))
+	}
 
 	if status != http.StatusOK {
 		c.rw.WriteHeader(status)
@@ -226,8 +231,10 @@ func (c *contextImpl) Bytes(status int, blob []byte) error {
 func (c *contextImpl) String(status int, format string, args ...any) error {
 	msg := fmt.Sprintf(format, args...)
 
-	c.Header().Set("Content-Type", "text/plain")
-	c.Header().Set("Content-Length", strconv.Itoa(len(msg)))
+	if c.Header().Get("Content-Type") == "" {
+		c.Header().Set("Content-Type", "text/plain")
+		c.Header().Set("Content-Length", strconv.Itoa(len(msg)))
+	}
 
 	c.rw.WriteHeader(status)
 	_, err := c.rw.Write([]byte(msg))
@@ -235,8 +242,10 @@ func (c *contextImpl) String(status int, format string, args ...any) error {
 }
 
 func (c *contextImpl) JSONBlob(status int, blob []byte) error {
-	c.Header().Set("Content-Type", "application/json")
-	c.Header().Set("Content-Length", strconv.Itoa(len(blob)))
+	if c.Header().Get("Content-Type") == "" {
+		c.Header().Set("Content-Type", "application/json")
+		c.Header().Set("Content-Length", strconv.Itoa(len(blob)))
+	}
 
 	c.rw.WriteHeader(status)
 	_, err := c.rw.Write(blob)
@@ -270,10 +279,15 @@ func (c *contextImpl) Redirect(status int, url string) error {
 	return nil
 }
 
+func (c *contextImpl) Cookie(status int, cookie *http.Cookie) {
+	http.SetCookie(c.rw, cookie)
+	c.rw.WriteHeader(status)
+}
+
 /**** Binders ****/
 
 func (c *contextImpl) BindJSON(v any) error {
-	return json.NewDecoder(c.req.Body).Decode(v)
+	return json.UnmarshalRead(c.req.Body, v)
 }
 
 func (c *contextImpl) BindQueryParams(v any) error {

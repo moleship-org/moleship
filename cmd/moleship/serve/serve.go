@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/moleship-org/moleship/internal/app"
-	"github.com/moleship-org/moleship/internal/domain/config"
+	"github.com/moleship-org/moleship/internal/config"
 	"github.com/spf13/cobra"
+
+	_ "github.com/moleship-org/moleship/internal/config"
 )
 
 var (
@@ -29,9 +31,20 @@ var cmd = &cobra.Command{
 		}
 
 		a := app.New(opts...)
-		a.Logger().Info(fmt.Sprintf("Running on '%s' mode", config.Current().Mode))
+		a.Logger().Info(fmt.Sprintf("Application running on '%s' mode", config.MODE))
 
-		a.Start(context.Background())
+		if err := a.Prepare(); err != nil {
+			return fmt.Errorf("Application.Prepare error: %w", err)
+		}
+
+		if err := a.MountRoutes(); err != nil {
+			return fmt.Errorf("Application.MountRoutes error: %w", err)
+		}
+
+		if err := a.Start(context.Background()); err != nil {
+			return fmt.Errorf("Application.Start error: %w", err)
+		}
+
 		return nil
 	},
 }

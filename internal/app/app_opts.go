@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/moleship-org/moleship/internal/domain/config"
+	"github.com/moleship-org/moleship/internal/config"
 )
 
 const (
@@ -37,21 +37,20 @@ func DefaultConfig() *Config {
 	cfg := new(Config)
 	cfg.Port = 5000
 
-	var loggerHandler slog.Handler
-	if config.Current().LogLevel != "" {
-		switch config.Current().LogLevel {
-		case "debug":
-			loggerHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
-		case "info":
-			loggerHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
-		case "warn":
-			loggerHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn})
-		case "error":
-			loggerHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})
-		}
-		cfg.Logger = slog.New(loggerHandler)
+	var logHandler slog.Handler
+	switch config.LOG_LEVEL {
+	case "debug":
+		logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+	case "warn":
+		logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn})
+	case "error":
+		logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})
+	case "info":
+		fallthrough
+	default:
+		logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	}
-	cfg.Logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	cfg.Logger = slog.New(logHandler)
 
 	cfg.ReadTimeout = DefaultReadTimeout
 	cfg.ReadHeaderTimeout = DefaultReadHeaderTimeout
