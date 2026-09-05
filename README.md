@@ -28,19 +28,10 @@ You'll find the resulting binary in `_output/bin/{GOOS}/{GOARCH}/{BIN}`.
 
 **Important**: The build process uses [scripts/build.sh](./scripts/build.sh).
 
-## Project structure
-
-    - _output/                  # Binaries
-    - cmd/                      # Entry points
-    - internal/                 # Source
-      - adapter/                # External providers
-      - core/                   # Core features, application and handlers
-      - domain/                 # Business logic entities and interface
-        - model/                # Data structs or records
-        - port/                 # In and out interfaces
-
 ## Docs
 
 ### Godoc
 
-    go doc -http
+```sh
+go doc -http
+```
