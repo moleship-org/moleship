@@ -1,7 +1,10 @@
 package cookies
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,6 +13,7 @@ import (
 
 const (
 	SessionCookieName = "moleship_session_token"
+	CSRFCookieName    = "moleship_csrf_token"
 	SessionDuration   = 24 * time.Hour
 )
 
@@ -27,6 +31,18 @@ func SessionCookie(token string) *http.Cookie {
 	}
 }
 
+func CSRFCookie(token string) *http.Cookie {
+	return &http.Cookie{
+		Name:     CSRFCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: false,
+		Secure:   config.IsReleaseMode(),
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   int(SessionDuration.Seconds()),
+	}
+}
+
 func ExpireSessionCookie() *http.Cookie {
 	return &http.Cookie{
 		Name:     SessionCookieName,
@@ -35,6 +51,18 @@ func ExpireSessionCookie() *http.Cookie {
 		HttpOnly: true,
 		Secure:   config.IsReleaseMode(),
 		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	}
+}
+
+func ExpireCSRFCookie() *http.Cookie {
+	return &http.Cookie{
+		Name:     CSRFCookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: false,
+		Secure:   config.IsReleaseMode(),
+		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	}
 }
@@ -48,4 +76,12 @@ func ReadSession(r *http.Request) (string, error) {
 		return "", ErrNoSession
 	}
 	return c.Value, nil
+}
+
+func NewCSRFToken() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", fmt.Errorf("cookies: failed to generate csrf token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
 }

@@ -39,6 +39,11 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+type sessionResponse struct {
+	Username  string `json:"username"`
+	CSRFToken string `json:"csrf_token"`
+}
+
 // POST /auth/login
 func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.From(w, r)
@@ -73,13 +78,24 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c.Cookie(http.StatusOK, cookies.SessionCookie(tokenSig))
+	csrfToken, err := cookies.NewCSRFToken()
+	if err != nil {
+		h.lg.Error("auth csrf generation error", slog.String("error", err.Error()))
+		c.Error(http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	http.SetCookie(c.Writer(), cookies.SessionCookie(tokenSig))
+	http.SetCookie(c.Writer(), cookies.CSRFCookie(csrfToken))
+	c.JSON(http.StatusOK, sessionResponse{Username: body.Username, CSRFToken: csrfToken})
 }
 
 // POST /auth/logout
 func (h *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 	c := apiutil.From(w, r)
-	c.Cookie(http.StatusNoContent, cookies.ExpireSessionCookie())
+	http.SetCookie(c.Writer(), cookies.ExpireSessionCookie())
+	http.SetCookie(c.Writer(), cookies.ExpireCSRFCookie())
+	c.Status(http.StatusNoContent)
 }
 
 // GET /auth/status
@@ -112,10 +128,6 @@ func (h *Auth) Session(w http.ResponseWriter, r *http.Request) {
 
 	changedAt, err := h.svc.ChangedAt()
 	if err != nil {
-		// No hay contraseña configurada (o se acaba de resetear vía
-		// password_init sin que el proceso haya vuelto a levantar
-		// creds en memoria todavía): cualquier token existente es
-		// inválido por definición.
 		c.Error(http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -126,7 +138,14 @@ func (h *Auth) Session(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c.JSON(http.StatusOK, map[string]string{
-		"username": claims.User,
+	csrfCookie, err := r.Cookie(cookies.CSRFCookieName)
+	if err != nil || csrfCookie.Value == "" {
+		c.Error(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	c.JSON(http.StatusOK, sessionResponse{
+		Username:  claims.User,
+		CSRFToken: csrfCookie.Value,
 	})
 }

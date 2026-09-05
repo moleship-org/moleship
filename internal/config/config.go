@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -9,22 +11,23 @@ import (
 
 const (
 	// Env variable names for configuration
-	EnvHostUser         = "MOLESHIP_HOST_USER"
-	EnvHostUID          = "MOLESHIP_HOST_UID"
-	EnvPort             = "MOLESHIP_PORT"
-	EnvLogLevel         = "MOLESHIP_LOG_LEVEL"
-	EnvMode             = "MOLESHIP_MODE"
-	EnvConfigHome       = "MOLESHIP_CONFIG_HOME"
-	EnvCacheHome        = "MOLESHIP_CACHE_HOME"
-	EnvDataHome         = "MOLESHIP_DATA_HOME"
-	EnvPodmanSocket     = "MOLESHIP_PODMAN_SOCKET"
-	EnvPodmanPath       = "MOLESHIP_PODMAN_PATH"
-	EnvSystemctlPath    = "MOLESHIP_SYSTEMCTL_PATH"
-	EnvQuadletHome      = "MOLESHIP_QUADLET_HOME"
-	EnvJWTSecret        = "MOLESHIP_JWT_SECRET"
-	EnvAllowedOrigins   = "MOLESHIP_ALLOWED_ORIGINS"
-	EnvPublicRateLimit  = "MOLESHIP_PUBLIC_RATE_LIMIT"
-	EnvPublicBurstLimit = "MOLESHIP_PUBLIC_BURST_LIMIT"
+	EnvHostUser             = "MOLESHIP_HOST_USER"
+	EnvHostUID              = "MOLESHIP_HOST_UID"
+	EnvPort                 = "MOLESHIP_PORT"
+	EnvLogLevel             = "MOLESHIP_LOG_LEVEL"
+	EnvMode                 = "MOLESHIP_MODE"
+	EnvConfigHome           = "MOLESHIP_CONFIG_HOME"
+	EnvCacheHome            = "MOLESHIP_CACHE_HOME"
+	EnvDataHome             = "MOLESHIP_DATA_HOME"
+	EnvPodmanSocket         = "MOLESHIP_PODMAN_SOCKET"
+	EnvPodmanPath           = "MOLESHIP_PODMAN_PATH"
+	EnvSystemctlPath        = "MOLESHIP_SYSTEMCTL_PATH"
+	EnvQuadletHome          = "MOLESHIP_QUADLET_HOME"
+	EnvJWTSecret            = "MOLESHIP_JWT_SECRET"
+	EnvAllowedOrigins       = "MOLESHIP_ALLOWED_ORIGINS"
+	EnvPublicRateLimit      = "MOLESHIP_PUBLIC_RATE_LIMIT"
+	EnvPublicBurstLimit     = "MOLESHIP_PUBLIC_BURST_LIMIT"
+	EnvPublicIPHeaderLookup = "MOLESHIP_PUBLIC_IP_HEADER_LOOKUP"
 
 	// Rootless defaults
 	DefaultRootlessConfigHome  = ".config/moleship"
@@ -86,14 +89,18 @@ var (
 	// Default json web token secret
 	JWT_SECRET []byte = []byte("mysecret")
 
-	// Default allowed origins
-	ALLOWED_ORIGINS []string = []string{"https://*", "http://*"}
+	// Default allowed origins. Empty by default; configure explicitly for browser access.
+	ALLOWED_ORIGINS []string = []string{}
 
 	// Default rate limit for the public endpoints
 	PUBLIC_RATE_LIMIT float64 = 15.0 // req/sec
 
 	// Default base burst for the public endpoints
 	PUBLIC_BURST_LIMIT int = 3
+
+	// Default IP header lookup for the public endpoint ratelimit
+	// "RemoteAddr", "X-Forwarded-For", "CF-Connecting-IP"
+	PUBLIC_IP_HEADER_LOOKUP string = "RemoteAddr"
 )
 
 func IsDebugMode() bool {
@@ -136,12 +143,13 @@ func init() {
 	PODMAN_PATH = getEnvOrDefault(EnvPodmanPath, "/usr/bin/podman")
 	SYSTEMCTL_PATH = getEnvOrDefault(EnvSystemctlPath, "/usr/bin/systemctl")
 
-	jwtSecret := getEnvOrDefault(EnvJWTSecret, "")
-	if jwtSecret == "" {
-		panic("MOLESHIP_JWT_SECRET must be specified")
+	secret, err := getOrCreateJWTSecret(DATA_HOME)
+	if err != nil {
+		panic("provide a MOLESHIP_JWT_SECRET or create a jwt_secret.key file at MOLESHIP_DATA_HOME")
 	}
+	JWT_SECRET = secret
 
-	allowedOrg := getEnvOrDefault(EnvAllowedOrigins, "https://*,http://*")
+	allowedOrg := strings.TrimSpace(getEnvOrDefault(EnvAllowedOrigins, ""))
 	if allowedOrg != "" {
 		ALLOWED_ORIGINS = strings.Split(allowedOrg, ",")
 	}
@@ -163,6 +171,8 @@ func init() {
 		}
 		PUBLIC_BURST_LIMIT = bl
 	}
+
+	PUBLIC_IP_HEADER_LOOKUP = getEnvOrDefault(EnvPublicIPHeaderLookup, PUBLIC_IP_HEADER_LOOKUP)
 
 	dirs := []string{CONFIG_HOME, CACHE_HOME, DATA_HOME, QUADLET_HOME}
 	for _, dir := range dirs {
@@ -198,4 +208,29 @@ func makeDirIfNotExists(path string) error {
 		}
 	}
 	return nil
+}
+
+func getOrCreateJWTSecret(dataHome string) ([]byte, error) {
+	secretPath := filepath.Join(dataHome, "jwt_secret.key")
+
+	if secret, err := os.ReadFile(secretPath); err == nil {
+		return secret, nil
+	}
+
+	if err := os.MkdirAll(dataHome, 0700); err != nil {
+		return nil, err
+	}
+
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return nil, err
+	}
+	key := base64.RawStdEncoding.EncodeToString(secret)
+
+	err := os.WriteFile(secretPath, []byte(key), 0600)
+	if err != nil {
+		return nil, err
+	}
+
+	return secret, nil
 }

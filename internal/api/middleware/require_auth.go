@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/moleship-org/moleship/internal/config"
@@ -17,16 +16,11 @@ func RequireAuth() func(next http.Handler) http.Handler {
 			var tokenString string
 
 			cookie, err := r.Cookie(cookies.SessionCookieName)
-			if err == nil {
-				tokenString = cookie.Value
-			} else {
-				if config.IsDebugMode() {
-					authHeader := r.Header.Get("Authorization")
-					if strings.HasPrefix(authHeader, "Bearer ") {
-						tokenString = strings.TrimPrefix(authHeader, "Bearer ")
-					}
-				}
+			if err != nil {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
 			}
+			tokenString = cookie.Value
 
 			if tokenString == "" {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)

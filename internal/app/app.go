@@ -1,14 +1,10 @@
 package app
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/didip/tollbooth/v8"
@@ -25,26 +21,33 @@ import (
 	"github.com/moleship-org/moleship/internal/services/quadlet"
 )
 
+type Config struct {
+	Addr   string
+	Logger *slog.Logger
+}
+
 type Application struct {
 	cfg *Config
 
-	router chi.Router
-
 	server *http.Server
+	router *chi.Mux
 
-	// --- Adapters ---
-
-	podmanAdapter  *podman.Podman
-	systemdAdapter *systemd.Systemd
-
-	// --- Services ---
-
-	quadletFS *quadlet.Filesystem
-
-	quadletSvc *quadlet.QuadletService
+	podmanAdapter  podman.Port
+	systemdAdapter systemd.Port
+	quadletFS      quadlet.FSPort
+	quadletSvc     *quadlet.QuadletService
 
 	authSvc *auth.AuthService
 }
+
+func DefaultConfig() *Config {
+	return &Config{
+		Addr:   fmt.Sprintf(":%d", config.PORT),
+		Logger: slog.Default(),
+	}
+}
+
+type Option func(c *Config)
 
 func New(opts ...Option) *Application {
 	cfg := DefaultConfig()
@@ -59,58 +62,63 @@ func New(opts ...Option) *Application {
 	return a
 }
 
-func (a *Application) Start(ctx context.Context) error {
+func (a *Application) Addr() string {
+	return a.cfg.Addr
+}
+
+func (a *Application) Start() error {
+	if err := a.Prepare(); err != nil {
+		return err
+	}
+	if err := a.MountRoutes(); err != nil {
+		return err
+	}
+
 	a.server = &http.Server{
-		Addr:              a.Addr(),
-		Handler:           a.router,
-		ReadTimeout:       a.cfg.ReadTimeout,
-		ReadHeaderTimeout: a.cfg.ReadHeaderTimeout,
-		WriteTimeout:      a.cfg.WriteTimeout,
-		IdleTimeout:       a.cfg.IdleTimeout,
-		MaxHeaderBytes:    a.cfg.MaxHeaderBytes,
+		Addr:    a.Addr(),
+		Handler: a.router,
 	}
 
 	serverErrors := make(chan error, 1)
+
 	go func() {
 		a.Logger().Info(fmt.Sprintf("Application running on http://localhost%s/ - Press CTRL+C to exit", a.Addr()))
 		serverErrors <- a.server.ListenAndServe()
 	}()
 
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+	return <-serverErrors
+}
 
-	select {
-	case err := <-serverErrors:
-		a.Logger().Error(err.Error())
-
-	case <-shutdown:
-		a.Logger().Warn("Starting application shutdown...")
-
-		ctx, cancel := context.WithTimeout(ctx, a.cfg.ShutdownTimeout)
-		defer cancel()
-
-		if shutErr := a.server.Shutdown(ctx); shutErr != nil {
-			a.Logger().Error("Shutdown error", slog.String("error", shutErr.Error()))
-			if closeErr := a.server.Close(); closeErr != nil {
-				return errors.Join(closeErr, shutErr)
-			}
-			return shutErr
-		}
+func (a *Application) Shutdown() error {
+	if a.server != nil {
+		return a.server.Close()
 	}
-
 	return nil
 }
 
-func (a Application) Addr() string {
-	return fmt.Sprintf(":%d", a.cfg.Port)
+func (a *Application) WithPodmanAdapter(p podman.Port) *Application {
+	a.podmanAdapter = p
+	return a
 }
 
-func (a *Application) Config() *Config {
-	if a.cfg == nil {
-		a.cfg = DefaultConfig()
-		return a.cfg
-	}
-	return a.cfg
+func (a *Application) WithSystemdAdapter(s systemd.Port) *Application {
+	a.systemdAdapter = s
+	return a
+}
+
+func (a *Application) WithQuadletFS(q quadlet.FSPort) *Application {
+	a.quadletFS = q
+	return a
+}
+
+func (a *Application) WithQuadletService(svc *quadlet.QuadletService) *Application {
+	a.quadletSvc = svc
+	return a
+}
+
+func (a *Application) WithAuthService(svc *auth.AuthService) *Application {
+	a.authSvc = svc
+	return a
 }
 
 func (a *Application) Logger() *slog.Logger {
@@ -137,14 +145,17 @@ func (a *Application) MountRoutes() error {
 	a.router.Use(middleware.ContextInjector(a.Logger()))
 	a.router.Use(middleware.RequestLogger())
 
-	a.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   config.ALLOWED_ORIGINS,
+	corsOptions := cors.Options{
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: config.IsReleaseMode(),
 		MaxAge:           300,
-	}))
+	}
+	if len(config.ALLOWED_ORIGINS) > 0 {
+		corsOptions.AllowedOrigins = config.ALLOWED_ORIGINS
+	}
+	a.router.Use(cors.Handler(corsOptions))
 
 	a.router.Use(chi_middleware.Recoverer)
 	a.router.Use(chi_middleware.RequestID)
@@ -156,11 +167,15 @@ func (a *Application) MountRoutes() error {
 	systemdHandler := handler.NewSystemd(a.Logger(), a.systemdAdapter)
 	quadletHandler := handler.NewQuadlet(a.Logger(), a.quadletSvc)
 
-	publicRate := config.PUBLIC_RATE_LIMIT
-	publicLimiter := tollbooth.NewLimiter(publicRate, &limiter.ExpirableOptions{
+	publicLimiter := tollbooth.NewLimiter(config.PUBLIC_RATE_LIMIT, &limiter.ExpirableOptions{
 		DefaultExpirationTTL: 1 * time.Hour,
 	})
+
 	publicLimiter.SetBurst(config.PUBLIC_BURST_LIMIT)
+	publicLimiter.SetIPLookup(limiter.IPLookup{
+		Name:           config.PUBLIC_IP_HEADER_LOOKUP,
+		IndexFromRight: 0,
+	})
 
 	a.router.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
@@ -173,6 +188,7 @@ func (a *Application) MountRoutes() error {
 
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAuth())
+				r.Use(middleware.RequireCSRF())
 
 				libpodHandler.Mount(r)
 				systemdHandler.Mount(r)
@@ -214,7 +230,7 @@ func (a *Application) Prepare() error {
 	if err != nil {
 		return err
 	}
-	a.authSvc = authSvc
 
+	a.authSvc = authSvc
 	return nil
 }
