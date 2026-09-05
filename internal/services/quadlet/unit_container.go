@@ -3,6 +3,8 @@ package quadlet
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 )
 
 type ContainerUnit struct {
@@ -83,6 +85,39 @@ func (c *ContainerUnit) Validate() error {
 	if c.Image == "" {
 		return fmt.Errorf("%w: Image is required", ErrInvalidUnit)
 	}
+	for _, publishPort := range c.PublishPorts {
+		if err := validatePublishPort(publishPort); err != nil {
+			return fmt.Errorf("%w: invalid PublishPort %q: %v", ErrInvalidUnit, publishPort, err)
+		}
+	}
+	return nil
+}
+
+func validatePublishPort(value string) error {
+	if value == "" {
+		return fmt.Errorf("value is required")
+	}
+
+	parts := strings.Split(value, ":")
+	if len(parts) < 2 || len(parts) > 3 {
+		return fmt.Errorf("expected format host:container or ip:host:container")
+	}
+
+	portParts := parts
+	if len(parts) == 3 {
+		portParts = parts[1:]
+	}
+
+	for _, portValue := range portParts {
+		port, err := strconv.Atoi(portValue)
+		if err != nil {
+			return fmt.Errorf("port %q is not a number", portValue)
+		}
+		if port < 1 || port > 65535 {
+			return fmt.Errorf("port %q must be between 1 and 65535", portValue)
+		}
+	}
+
 	return nil
 }
 
