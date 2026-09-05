@@ -172,7 +172,7 @@ func (a *Application) MountRoutes() error {
 			})
 
 			r.Group(func(r chi.Router) {
-				//r.Use(middleware.RequireAuth())
+				r.Use(middleware.RequireAuth())
 
 				libpodHandler.Mount(r)
 				systemdHandler.Mount(r)
