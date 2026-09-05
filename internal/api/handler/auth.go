@@ -2,167 +2,131 @@ package handler
 
 import (
 	"errors"
-	"io"
+	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/moleship-org/moleship/internal/api/apiutil"
-	"github.com/moleship-org/moleship/internal/api/cookies"
-	"github.com/moleship-org/moleship/internal/api/serializer"
-	"github.com/moleship-org/moleship/internal/service/auth"
+	"github.com/moleship-org/moleship/internal/config"
+	"github.com/moleship-org/moleship/internal/services/auth"
+	"github.com/moleship-org/moleship/internal/services/auth/authtoken"
+	"github.com/moleship-org/moleship/internal/services/auth/cookies"
 )
 
 type Auth struct {
-	authSvc *auth.AuthService
+	lg  *slog.Logger
+	svc *auth.AuthService
 }
 
-func NewAuth(authSvc *auth.AuthService) *Auth {
-	return &Auth{authSvc: authSvc}
+func NewAuth(l *slog.Logger, s *auth.AuthService) *Auth {
+	return &Auth{lg: l, svc: s}
 }
 
-func (h *Auth) Mux(r chi.Router) {
+func (h *Auth) Mount(r chi.Router) {
+	h.lg.Info("Mounting /auth endpoint")
+
 	r.Route("/auth", func(r chi.Router) {
-		r.Group(func(r chi.Router) {
-			r.Post("/login", h.Login)
-		})
-
-		r.Group(func(r chi.Router) {
-			r.Post("/register", h.Register)
-		})
-
-		r.Group(func(r chi.Router) {
-			r.Post("/refresh", h.Refresh)
-		})
-
+		r.Post("/login", h.Login)
 		r.Post("/logout", h.Logout)
+		r.Get("/status", h.Status)
+		r.Get("/session", h.Session)
 	})
 }
 
+type loginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// POST /auth/login
 func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
-	c := apiutil.FromRequest(w, r)
+	c := apiutil.From(w, r)
 
-	var req serializer.LoginRequest
-	if err := c.BindJSON(&req); err != nil {
-		c.Error(http.StatusBadRequest, "invalid request body")
+	var body loginRequest
+	if err := c.BindJSON(&body); err != nil {
+		h.lg.Error("auth bind json error", slog.String("error", err.Error()))
+		c.Error(http.StatusBadRequest, "invalid payload")
 		return
 	}
 
-	if err := req.Validate(); err != nil {
-		c.Error(http.StatusBadRequest, "invalid login data: "+err.Error())
+	if !h.svc.IsConfigured() {
+		c.Error(http.StatusPreconditionFailed, "instance not configured yet")
 		return
 	}
 
-	token, err := h.authSvc.Login(r.Context(), req.Username, req.Password)
-	if errors.Is(err, auth.ErrInvalidCredentials) {
-		c.Logger().Info("Invalid credentials for user: %s", req.Username)
-		c.Error(http.StatusUnauthorized, "invalid credentials")
-		return
-	}
-	if err != nil {
-		c.Logger().Error("error logging in: " + err.Error())
-		c.Error(http.StatusInternalServerError, "internal server error")
-		return
-	}
-
-	http.SetCookie(w, cookies.SessionCookie(token))
-	c.Set("token", token)
-	c.JSON(http.StatusOK, serializer.TokenResponse{Token: token})
-}
-
-func (h *Auth) Register(w http.ResponseWriter, r *http.Request) {
-	c := apiutil.FromRequest(w, r)
-
-	var req serializer.RegisterRequest
-	if err := c.BindJSON(&req); err != nil {
-		c.Error(http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	if err := req.Validate(); err != nil {
-		c.Error(http.StatusBadRequest, "invalid registration data: "+err.Error())
-		return
-	}
-
-	token, err := h.authSvc.Register(r.Context(), req.Username, req.Email, req.Password)
-	if errors.Is(err, auth.ErrUserExists) {
-		c.Error(http.StatusConflict, "user already exists")
-		return
-	}
-	if err != nil {
-		c.Logger().Error("error registering user: " + err.Error())
-		c.Error(http.StatusInternalServerError, "internal server error")
-		return
-	}
-
-	http.SetCookie(w, cookies.SessionCookie(token))
-	c.Set("token", token)
-	c.JSON(http.StatusCreated, serializer.TokenResponse{Token: token})
-}
-
-func (h *Auth) Refresh(w http.ResponseWriter, r *http.Request) {
-	c := apiutil.FromRequest(w, r)
-
-	var req serializer.RefreshRequest
-	if err := c.BindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
-		c.Error(http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	tokenString := strings.TrimSpace(req.Token)
-	if tokenString == "" {
-		if cookie, err := r.Cookie(cookies.SessionCookieName); err == nil {
-			tokenString = cookie.Value
+	if err := h.svc.Verify(body.Username, body.Password); err != nil {
+		if !errors.Is(err, auth.ErrInvalidCredentials) && !errors.Is(err, auth.ErrNotConfigured) {
+			h.lg.Error("auth verify error", slog.String("error", err.Error()))
 		}
-	}
-	if tokenString == "" {
-		c.Error(http.StatusBadRequest, "invalid refresh data: token is required")
+		c.Error(http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	token, err := h.authSvc.Refresh(r.Context(), tokenString)
-	if errors.Is(err, auth.ErrInvalidToken) {
-		c.Error(http.StatusUnauthorized, "invalid or expired token")
-		return
-	}
+	claims := authtoken.ClaimsFromUser(body.Username)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenSig, err := token.SignedString(config.JWT_SECRET)
 	if err != nil {
-		c.Logger().Error("error refreshing token: " + err.Error())
-		c.Error(http.StatusInternalServerError, "internal server error")
+		h.lg.Error("auth sign token error", slog.String("error", err.Error()))
+		c.Error(http.StatusInternalServerError, "internal error")
 		return
 	}
 
-	http.SetCookie(w, cookies.SessionCookie(token))
-	c.Set("token", token)
-	c.JSON(http.StatusOK, serializer.TokenResponse{Token: token})
+	c.Cookie(http.StatusOK, cookies.SessionCookie(tokenSig))
 }
 
+// POST /auth/logout
 func (h *Auth) Logout(w http.ResponseWriter, r *http.Request) {
-	c := apiutil.FromRequest(w, r)
+	c := apiutil.From(w, r)
+	c.Cookie(http.StatusNoContent, cookies.ExpireSessionCookie())
+}
 
-	var req serializer.LogoutRequest
-	if err := c.BindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
-		c.Error(http.StatusBadRequest, "invalid request body")
+// GET /auth/status
+func (h *Auth) Status(w http.ResponseWriter, r *http.Request) {
+	c := apiutil.From(w, r)
+
+	c.JSON(http.StatusOK, map[string]bool{
+		"configured": h.svc.IsConfigured(),
+	})
+}
+
+// GET /auth/session
+func (h *Auth) Session(w http.ResponseWriter, r *http.Request) {
+	c := apiutil.From(w, r)
+
+	tokenStr, err := cookies.ReadSession(r)
+	if err != nil {
+		c.Error(http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	tokenString := strings.TrimSpace(req.Token)
-	if tokenString == "" {
-		if cookie, err := r.Cookie(cookies.SessionCookieName); err == nil {
-			tokenString = cookie.Value
-		}
-	}
-	if tokenString == "" {
-		c.Error(http.StatusBadRequest, "invalid logout data: token is required")
+	claims := &authtoken.Claims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+		return config.JWT_SECRET, nil
+	})
+	if err != nil || !token.Valid {
+		c.Error(http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	if err := h.authSvc.Logout(r.Context(), tokenString); err != nil {
-		c.Logger().Error("error logging out: " + err.Error())
-		c.Error(http.StatusInternalServerError, "internal server error")
+	changedAt, err := h.svc.ChangedAt()
+	if err != nil {
+		// No hay contraseña configurada (o se acaba de resetear vía
+		// password_init sin que el proceso haya vuelto a levantar
+		// creds en memoria todavía): cualquier token existente es
+		// inválido por definición.
+		c.Error(http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	http.SetCookie(w, cookies.ExpireSessionCookie())
-	c.Set("token", nil)
-	c.Status(http.StatusNoContent)
+	issuedAt, err := claims.GetIssuedAt()
+	if err != nil || issuedAt == nil || issuedAt.Time.Before(changedAt) {
+		c.Error(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	c.JSON(http.StatusOK, map[string]string{
+		"username": claims.User,
+	})
 }

@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -12,32 +12,43 @@ import (
 )
 
 type Libpod struct {
-	podmanProv podman.PodmanPort
+	lg  *slog.Logger
+	pdm podman.Port
 }
 
-func NewLibpod(s podman.PodmanPort) *Libpod {
+func NewLibpod(lg *slog.Logger, s podman.Port) *Libpod {
 	return &Libpod{
-		podmanProv: s,
+		lg:  lg,
+		pdm: s,
 	}
 }
 
-func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
-	ctx := apiutil.FromRequest(w, r)
+func (h *Libpod) Mount(r chi.Router) {
+	h.lg.Info("Mounting /libpod endpoint")
+
+	r.Route("/libpod", func(r chi.Router) {
+		r.HandleFunc("/*", h.SocketAPI)
+	})
+}
+
+func (h *Libpod) SocketAPI(w http.ResponseWriter, r *http.Request) {
+	ctx := apiutil.From(w, r)
 	path := ctx.PathValue("*")
 
 	libpodPath := strings.Split(path, "/")
 	libpodPath = append(libpodPath, "?", r.URL.Query().Encode())
 
-	res, err := p.podmanProv.RawCall(r.Context(), r.Method, libpodPath...)
-	if errors.Is(err, podman.ErrContainerNotFound) {
-		ctx.Status(http.StatusNotFound)
-		return
-	}
+	res, err := h.pdm.RawCall(r.Context(), r.Method, libpodPath...)
 	if err != nil {
+		h.lg.Error("error trying to call podman socket", slog.String("error", err.Error()))
 		ctx.Error(http.StatusInternalServerError, "error trying to call podman socket")
 		return
 	}
 	defer res.Body.Close()
+
+	for key, value := range res.Header {
+		ctx.Header().Set(key, strings.Join(value, ","))
+	}
 
 	if res.Body != nil {
 		b, err := io.ReadAll(res.Body)
@@ -46,20 +57,9 @@ func (p *Libpod) Libpod(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ctx.Header().Set("Content-Type", res.Header.Get("Content-Type"))
 		ctx.Bytes(res.StatusCode, b)
 		return
 	}
 
-	for key, value := range res.Header {
-		ctx.Header().Set(key, strings.Join(value, ","))
-	}
-
 	ctx.Status(res.StatusCode)
-}
-
-func (p *Libpod) Mux(r chi.Router) {
-	r.Route("/libpod", func(r chi.Router) {
-		r.HandleFunc("/*", p.Libpod)
-	})
 }

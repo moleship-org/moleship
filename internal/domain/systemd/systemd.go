@@ -2,20 +2,29 @@ package systemd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
+const DefaultCommandTimeout = 15 * time.Second
+
 type NewSystemdParams struct {
-	BindPath string
-	UserMode bool
+	BindPath       string
+	UserMode       bool
+	CommandTimeout time.Duration
 }
 
 type Systemd struct {
-	binPath  string
-	userMode bool
+	binPath    string
+	userMode   bool
+	cmdTimeout time.Duration
 }
+
+var _ Port = (*Systemd)(nil)
 
 func New(params *NewSystemdParams) *Systemd {
 	if params == nil {
@@ -32,23 +41,34 @@ func New(params *NewSystemdParams) *Systemd {
 		}
 	}
 
+	if params.CommandTimeout == 0 {
+		params.CommandTimeout = DefaultCommandTimeout
+	}
+
 	sys.binPath = params.BindPath
 	sys.userMode = params.UserMode
+	sys.cmdTimeout = params.CommandTimeout
 	return sys
 }
 
-func (s *Systemd) cmd(ctx context.Context, args ...string) *exec.Cmd {
+func (s *Systemd) cmd(ctx context.Context, args ...string) (cmd *exec.Cmd, cancel context.CancelFunc) {
+	ctx, cancel = context.WithTimeout(ctx, s.cmdTimeout)
+
 	var finalArgs []string
 	if s.userMode {
 		finalArgs = append(finalArgs, "--user")
 	}
 	finalArgs = append(finalArgs, args...)
 
-	return exec.CommandContext(ctx, s.binPath, finalArgs...)
+	cmd = exec.CommandContext(ctx, s.binPath, finalArgs...)
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "LANG=C")
+	return cmd, cancel
 }
 
 func (s *Systemd) runWithStderr(ctx context.Context, args ...string) (string, error) {
-	cmd := s.cmd(ctx, args...)
+	cmd, cancel := s.cmd(ctx, args...)
+	defer cancel()
+
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 
@@ -57,7 +77,8 @@ func (s *Systemd) runWithStderr(ctx context.Context, args ...string) (string, er
 }
 
 func (s *Systemd) UnitStatus(ctx context.Context, unitName string) (string, error) {
-	cmd := s.cmd(ctx, "is-active", unitName)
+	cmd, cancel := s.cmd(ctx, "is-active", unitName)
+	defer cancel()
 
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
@@ -69,6 +90,11 @@ func (s *Systemd) UnitStatus(ctx context.Context, unitName string) (string, erro
 	if err != nil {
 		if status == "inactive" || status == "failed" {
 			return status, nil
+		}
+
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 4 {
+			return "", ErrUnitNotFound
 		}
 
 		if strings.Contains(status, "not-found") || status == "unknown" || strings.Contains(stderrStr, "not found") {
@@ -84,13 +110,7 @@ func (s *Systemd) UnitStatus(ctx context.Context, unitName string) (string, erro
 func (s *Systemd) StartUnit(ctx context.Context, unitName string) error {
 	stderr, err := s.runWithStderr(ctx, "start", unitName)
 	if err != nil {
-		if strings.Contains(stderr, "not found") || strings.Contains(stderr, "does not exist") {
-			return ErrUnitNotFound
-		}
-		if strings.Contains(stderr, "Permission denied") {
-			return ErrPermissionDenied
-		}
-		return fmt.Errorf("%w: %v", ErrCommandFailed, err)
+		return classifyUnitError(stderr, err)
 	}
 	return nil
 }
@@ -98,10 +118,7 @@ func (s *Systemd) StartUnit(ctx context.Context, unitName string) error {
 func (s *Systemd) StopUnit(ctx context.Context, unitName string) error {
 	stderr, err := s.runWithStderr(ctx, "stop", unitName)
 	if err != nil {
-		if strings.Contains(stderr, "not found") || strings.Contains(stderr, "does not exist") {
-			return ErrUnitNotFound
-		}
-		return fmt.Errorf("%w: %v", ErrCommandFailed, err)
+		return classifyUnitError(stderr, err)
 	}
 	return nil
 }
@@ -109,10 +126,7 @@ func (s *Systemd) StopUnit(ctx context.Context, unitName string) error {
 func (s *Systemd) RestartUnit(ctx context.Context, unitName string) error {
 	stderr, err := s.runWithStderr(ctx, "restart", unitName)
 	if err != nil {
-		if strings.Contains(stderr, "not found") || strings.Contains(stderr, "does not exist") {
-			return ErrUnitNotFound
-		}
-		return fmt.Errorf("%w: %v", ErrCommandFailed, err)
+		return classifyUnitError(stderr, err)
 	}
 	return nil
 }
@@ -120,7 +134,17 @@ func (s *Systemd) RestartUnit(ctx context.Context, unitName string) error {
 func (s *Systemd) ReloadDaemon(ctx context.Context) error {
 	stderr, err := s.runWithStderr(ctx, "daemon-reload")
 	if err != nil {
-		return fmt.Errorf("%w: %s (exit: %v)", ErrDaemonReloadFailed, stderr, err)
+		return fmt.Errorf("%w: %v (details: %s)", ErrDaemonReloadFailed, err, stderr)
 	}
 	return nil
+}
+
+func classifyUnitError(stderr string, err error) error {
+	if strings.Contains(stderr, "not found") || strings.Contains(stderr, "does not exist") {
+		return ErrUnitNotFound
+	}
+	if strings.Contains(stderr, "Permission denied") || strings.Contains(stderr, "Access denied") {
+		return ErrPermissionDenied
+	}
+	return fmt.Errorf("%w: %v (details: %s)", ErrCommandFailed, err, stderr)
 }

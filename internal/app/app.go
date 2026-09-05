@@ -2,52 +2,48 @@ package app
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/didip/tollbooth/v8"
+	"github.com/didip/tollbooth/v8/limiter"
 	"github.com/go-chi/chi/v5"
 	chi_middleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/moleship-org/moleship/internal/api/handler"
 	"github.com/moleship-org/moleship/internal/api/middleware"
-	"github.com/moleship-org/moleship/internal/domain/config"
-	"github.com/moleship-org/moleship/internal/domain/crypto"
-	"github.com/moleship-org/moleship/internal/domain/persistence"
+	"github.com/moleship-org/moleship/internal/config"
 	"github.com/moleship-org/moleship/internal/domain/podman"
 	"github.com/moleship-org/moleship/internal/domain/systemd"
-	"github.com/moleship-org/moleship/internal/service/auth"
-	"github.com/moleship-org/moleship/internal/service/container"
-	"github.com/moleship-org/moleship/internal/service/quadlet"
-
-	_ "modernc.org/sqlite"
+	"github.com/moleship-org/moleship/internal/services/auth"
+	"github.com/moleship-org/moleship/internal/services/quadlet"
 )
 
 type Application struct {
-	cfg    *Config
+	cfg *Config
+
 	router chi.Router
 
-	// --- Domain Services
+	server *http.Server
 
-	systemdSvc  systemd.SystemdPort
-	podmanSvc   podman.PodmanPort
-	passwordMan crypto.PasswordManager
-	tokenGen    crypto.TokenGenerator
+	// --- Adapters ---
 
-	// --- Services
+	podmanAdapter  *podman.Podman
+	systemdAdapter *systemd.Systemd
 
-	containerSvc *container.ContainerService
-	quadletSvc   *quadlet.QuadletService
-	authSvc      *auth.AuthService
+	// --- Services ---
 
-	// --- Persistence
+	quadletFS *quadlet.Filesystem
 
-	repo        persistence.Repository
-	userRepo    *persistence.UserRepository
-	sessionRepo *persistence.SessionRepository
+	quadletSvc *quadlet.QuadletService
+
+	authSvc *auth.AuthService
 }
 
 func New(opts ...Option) *Application {
@@ -63,28 +59,21 @@ func New(opts ...Option) *Application {
 	return a
 }
 
-func (a *Application) Start(ctx context.Context) {
-	a.Prepare()
-
-	server := &http.Server{
-		Addr:    a.Addr(),
-		Handler: a.router,
-		// Time for the whole request to complete (headers + body)
-		ReadTimeout: a.cfg.ReadTimeout,
-		// Time for reading the request headers only (helps mitigate slowloris attacks)
+func (a *Application) Start(ctx context.Context) error {
+	a.server = &http.Server{
+		Addr:              a.Addr(),
+		Handler:           a.router,
+		ReadTimeout:       a.cfg.ReadTimeout,
 		ReadHeaderTimeout: a.cfg.ReadHeaderTimeout,
-		// Time for writing the response
-		WriteTimeout: a.cfg.WriteTimeout,
-		// Time that an idle connection waits before closing
-		IdleTimeout: a.cfg.IdleTimeout,
-		// Maximum size of request headers (helps mitigate DoS attacks)
-		MaxHeaderBytes: a.cfg.MaxHeaderBytes,
+		WriteTimeout:      a.cfg.WriteTimeout,
+		IdleTimeout:       a.cfg.IdleTimeout,
+		MaxHeaderBytes:    a.cfg.MaxHeaderBytes,
 	}
 
 	serverErrors := make(chan error, 1)
 	go func() {
 		a.Logger().Info(fmt.Sprintf("Application running on http://localhost%s/ - Press CTRL+C to exit", a.Addr()))
-		serverErrors <- server.ListenAndServe()
+		serverErrors <- a.server.ListenAndServe()
 	}()
 
 	shutdown := make(chan os.Signal, 1)
@@ -100,11 +89,16 @@ func (a *Application) Start(ctx context.Context) {
 		ctx, cancel := context.WithTimeout(ctx, a.cfg.ShutdownTimeout)
 		defer cancel()
 
-		if err := server.Shutdown(ctx); err != nil {
-			a.Logger().Error(err.Error())
-			_ = server.Close()
+		if shutErr := a.server.Shutdown(ctx); shutErr != nil {
+			a.Logger().Error("Shutdown error", slog.String("error", shutErr.Error()))
+			if closeErr := a.server.Close(); closeErr != nil {
+				return errors.Join(closeErr, shutErr)
+			}
+			return shutErr
 		}
 	}
+
+	return nil
 }
 
 func (a Application) Addr() string {
@@ -126,55 +120,63 @@ func (a *Application) Logger() *slog.Logger {
 	return a.cfg.Logger
 }
 
-func (a *Application) Prepare() {
-	a.setupDatabase()
-	a.setupServices()
-	a.setupRoutes()
-}
-
-func (a *Application) setupRoutes() error {
-	if a.repo == nil || a.userRepo == nil || a.sessionRepo == nil {
-		return fmt.Errorf("repositories are not initialized")
+func (a *Application) MountRoutes() error {
+	if a.podmanAdapter == nil {
+		return errors.New("invalid podman adapter: nil")
 	}
-	if a.systemdSvc == nil || a.podmanSvc == nil || a.containerSvc == nil || a.quadletSvc == nil || a.authSvc == nil {
-		return fmt.Errorf("services are not initialized")
+	if a.systemdAdapter == nil {
+		return errors.New("invalid systemd adapter: nil")
+	}
+	if a.quadletSvc == nil {
+		return errors.New("invalid quadlet service: nil")
+	}
+	if a.authSvc == nil {
+		return errors.New("invalid auth service: nil")
 	}
 
 	a.router.Use(middleware.ContextInjector(a.Logger()))
-	a.router.Use(middleware.Logger(a.Logger()))
-	a.router.Use(middleware.CORS())
+	a.router.Use(middleware.RequestLogger())
+
+	a.router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   config.ALLOWED_ORIGINS,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: config.IsReleaseMode(),
+		MaxAge:           300,
+	}))
+
 	a.router.Use(chi_middleware.Recoverer)
 	a.router.Use(chi_middleware.RequestID)
-	a.router.Use(chi_middleware.RealIP)
+	a.router.Use(chi_middleware.CleanPath)
 
-	healthHandler := handler.NewHealth()
-	authHandler := handler.NewAuth(a.authSvc)
-	containerHandler := handler.NewContainer(a.containerSvc)
-	quadletHandler := handler.NewQuadlet(a.quadletSvc)
-	libpodHandler := handler.NewLibpod(a.podmanSvc)
-	userHandler := handler.NewUser(a.userRepo)
-	adminHandler := handler.NewAdmin(a.userRepo)
+	healthHandler := handler.NewHealth(a.Logger())
+	authHandler := handler.NewAuth(a.Logger(), a.authSvc)
+	libpodHandler := handler.NewLibpod(a.Logger(), a.podmanAdapter)
+	systemdHandler := handler.NewSystemd(a.Logger(), a.systemdAdapter)
+	quadletHandler := handler.NewQuadlet(a.Logger(), a.quadletSvc)
+
+	publicRate := config.PUBLIC_RATE_LIMIT
+	publicLimiter := tollbooth.NewLimiter(publicRate, &limiter.ExpirableOptions{
+		DefaultExpirationTTL: 1 * time.Hour,
+	})
+	publicLimiter.SetBurst(config.PUBLIC_BURST_LIMIT)
 
 	a.router.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
-			healthHandler.Mux(r)
-			authHandler.Mux(r)
-
-			// Protected routes
 			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireAuth(a.authSvc))
+				r.Use(tollbooth.HTTPMiddleware(publicLimiter))
 
-				containerHandler.Mux(r)
-				quadletHandler.Mux(r)
-				libpodHandler.Mux(r)
-				userHandler.Mux(r)
+				healthHandler.Mount(r)
+				authHandler.Mount(r)
+			})
 
-				// Admin-only routes
-				r.Group(func(r chi.Router) {
-					r.Use(middleware.AdminOnly(a.userRepo))
+			r.Group(func(r chi.Router) {
+				//r.Use(middleware.RequireAuth())
 
-					adminHandler.Mux(r)
-				})
+				libpodHandler.Mount(r)
+				systemdHandler.Mount(r)
+				quadletHandler.Mount(r)
 			})
 		})
 	})
@@ -182,66 +184,37 @@ func (a *Application) setupRoutes() error {
 	return nil
 }
 
-func (a *Application) setupServices() {
-	a.systemdSvc = systemd.New(&systemd.NewSystemdParams{
-		BindPath: config.Current().SystemctlPath,
-		UserMode: !config.Current().Rootful,
+func (a *Application) Prepare() error {
+	a.podmanAdapter = podman.New(&podman.NewPodmanParams{
+		Version:    config.PODMAN_VERSION,
+		SocketPath: config.PODMAN_SOCKET,
 	})
 
-	a.podmanSvc = podman.New(&podman.NewPodmanParams{
-		SocketPath: config.Current().PodmanSocket,
-		Version:    config.Current().PodmanVersion,
+	a.systemdAdapter = systemd.New(&systemd.NewSystemdParams{
+		BindPath: config.SYSTEMCTL_PATH,
+		UserMode: !config.ROOTFUL,
 	})
 
-	a.containerSvc = container.NewContainerService(&container.NewContainerServiceParams{
-		Systemd: a.systemdSvc,
-		Podman:  a.podmanSvc,
+	fsq, err := quadlet.NewFilesystem(&quadlet.NewFilesystemParams{
+		BaseDir:  config.QUADLET_HOME,
+		UserMode: !config.ROOTFUL,
 	})
-
-	a.quadletSvc = quadlet.NewQuadletService(&quadlet.NewQuadletServiceParams{
-		Systemd: a.systemdSvc,
-		Podman:  a.podmanSvc,
-	})
-
-	a.passwordMan = crypto.NewDefaultPasswordManager()
-	a.tokenGen = crypto.NewTokenGenerator()
-
-	a.authSvc = auth.NewAuthService(&auth.AuthServiceParams{
-		UsersStrategyFlag: config.Current().AuthUsersStrategy,
-		UserRepo:          a.userRepo,
-		SessionRepo:       a.sessionRepo,
-		PasswordManager:   a.passwordMan,
-		TokenGenerator:    a.tokenGen,
-	})
-}
-
-func (a *Application) setupDatabase() {
-	path := fmt.Sprintf("%s/moleship.db", config.Current().DataHome)
-	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		a.Logger().Info("Database file not found, creating new one...")
-		file, err := os.Create(path)
-		if err != nil {
-			a.Logger().Error(fmt.Sprintf("Failed to create database file: %s", err.Error()))
-			os.Exit(1)
-		}
-		file.Close()
-	}
-
-	dbUri := fmt.Sprintf("file:%s?cache=shared&_fk=1", path)
-	conn, err := sql.Open("sqlite", dbUri)
 	if err != nil {
-		a.Logger().Error(fmt.Sprintf("Failed to open database: %s", err.Error()))
-		os.Exit(1)
+		return err
 	}
 
-	err = persistence.RunMigrations(conn, "database/migrations")
+	a.quadletFS = fsq
+	a.quadletSvc = quadlet.New(a.quadletFS, a.systemdAdapter)
+
+	authSvc, err := auth.NewAuthService(&auth.NewAuthServiceParams{
+		HostUser:   config.HOST_USER,
+		Dir:        config.DATA_HOME,
+		BcryptCost: 13,
+	})
 	if err != nil {
-		a.Logger().Error(fmt.Sprintf("Failed to run database migrations: %s", err.Error()))
-		os.Exit(1)
+		return err
 	}
+	a.authSvc = authSvc
 
-	a.repo = persistence.NewSQLiteRepository(conn)
-	a.userRepo = persistence.NewUserRepository(a.repo)
-	a.sessionRepo = persistence.NewSessionRepository(a.repo)
+	return nil
 }

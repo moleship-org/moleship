@@ -25,6 +25,8 @@ type Podman struct {
 	client     *http.Client
 }
 
+var _ Port = (*Podman)(nil)
+
 func New(params *NewPodmanParams) *Podman {
 	if params == nil {
 		params = new(NewPodmanParams)
@@ -75,24 +77,25 @@ func (p *Podman) RawCall(ctx context.Context, method string, path ...string) (*h
 		return nil, fmt.Errorf("%w: %v", ErrConnectionRefused, err)
 	}
 
-	if res.StatusCode >= 400 {
-		defer res.Body.Close()
-
-		var podmanErr struct {
-			Cause   string `json:"cause"`
-			Message string `json:"message"`
-		}
-
-		if decodeErr := json.NewDecoder(res.Body).Decode(&podmanErr); decodeErr == nil {
-			return nil, fmt.Errorf("podman api error (%d): %s - %s",
-				res.StatusCode, podmanErr.Cause, podmanErr.Message)
-		}
-
-		return nil, fmt.Errorf("podman api returned unexpected status: %d", res.StatusCode)
-	}
-
 	return res, nil
 }
+
+func decodePodmanError(res *http.Response) error {
+	defer res.Body.Close()
+
+	var podmanErr struct {
+		Cause   string `json:"cause"`
+		Message string `json:"message"`
+	}
+
+	if decodeErr := json.NewDecoder(res.Body).Decode(&podmanErr); decodeErr == nil {
+		return fmt.Errorf("podman api error (%d): %s - %s",
+			res.StatusCode, podmanErr.Cause, podmanErr.Message)
+	}
+
+	return fmt.Errorf("podman api returned unexpected status: %d", res.StatusCode)
+}
+
 func (p *Podman) Ping(ctx context.Context) (http.Header, error) {
 	res, err := p.RawCall(ctx, http.MethodGet, "_ping")
 	if err != nil {
@@ -100,11 +103,30 @@ func (p *Podman) Ping(ctx context.Context) (http.Header, error) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusInternalServerError {
-		return nil, fmt.Errorf("%w: unexpected status %s", ErrInvalidResponse, res.Status)
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, decodePodmanError(res))
 	}
 
 	return res.Header, nil
+}
+
+func (p *Podman) GetVersion(ctx context.Context) (*entities.ComponentVersion, error) {
+	res, err := p.RawCall(ctx, http.MethodGet, "version")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, decodePodmanError(res))
+	}
+
+	var cv entities.ComponentVersion
+	if err := json.NewDecoder(res.Body).Decode(&cv); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
+	}
+
+	return &cv, nil
 }
 
 func (p *Podman) ListContainers(ctx context.Context, opts url.Values) ([]entities.ListContainer, error) {
@@ -119,7 +141,7 @@ func (p *Podman) ListContainers(ctx context.Context, opts url.Values) ([]entitie
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: status %s", ErrInvalidResponse, res.Status)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, decodePodmanError(res))
 	}
 
 	var containers []entities.ListContainer
@@ -130,26 +152,6 @@ func (p *Podman) ListContainers(ctx context.Context, opts url.Values) ([]entitie
 	return containers, nil
 }
 
-func (p *Podman) GetVersion(ctx context.Context) (*SystemVersion, error) {
-	res, err := p.RawCall(ctx, http.MethodGet, "version")
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: status %s", ErrInvalidResponse, res.Status)
-	}
-
-	var cv entities.ComponentVersion
-	if err := json.NewDecoder(res.Body).Decode(&cv); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
-	}
-
-	pv := &SystemVersion{Data: cv}
-	return pv, nil
-}
-
 func (p *Podman) Exists(ctx context.Context, name string) (bool, error) {
 	res, err := p.RawCall(ctx, http.MethodGet, "containers", name, "exists")
 	if err != nil {
@@ -157,28 +159,34 @@ func (p *Podman) Exists(ctx context.Context, name string) (bool, error) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusNoContent {
+	switch res.StatusCode {
+	case http.StatusNoContent:
 		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, decodePodmanError(res)
 	}
-
-	return false, nil
 }
 
-func (p *Podman) Stats(ctx context.Context, name string) (*ContainerStats, error) {
+func (p *Podman) Stats(ctx context.Context, name string) (*entities.ContainerStatReport, error) {
 	res, err := p.RawCall(ctx, http.MethodGet, "containers", name, "stats", "?stream=false")
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusNotFound {
+	switch res.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
 		return nil, ErrContainerNotFound
-	}
-	if res.StatusCode == http.StatusInternalServerError {
+	case http.StatusInternalServerError:
 		return nil, fmt.Errorf("podman adapter internal error")
+	default:
+		return nil, decodePodmanError(res)
 	}
 
-	var report ContainerStats
+	var report entities.ContainerStatReport
 	if err := json.NewDecoder(res.Body).Decode(&report); err != nil {
 		return nil, ErrInvalidResponse
 	}
@@ -196,12 +204,17 @@ func (p *Podman) Logs(ctx context.Context, name string, opts url.Values) (io.Rea
 		return nil, err
 	}
 
-	if res.StatusCode == http.StatusNotFound {
+	switch res.StatusCode {
+	case http.StatusOK:
+		// open body to be closed by the caller
+		return res.Body, nil
+	case http.StatusNotFound:
+		res.Body.Close()
 		return nil, ErrContainerNotFound
-	}
-	if res.StatusCode == http.StatusInternalServerError {
+	case http.StatusInternalServerError:
+		res.Body.Close()
 		return nil, fmt.Errorf("internal error when trying to get logs")
+	default:
+		return nil, decodePodmanError(res)
 	}
-
-	return res.Body, nil
 }
