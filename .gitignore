@@ -11,6 +11,7 @@ testdata/
 build/
 bin/
 _output/
+.gocache
 
 # Git Worktrees
 worktrees/
