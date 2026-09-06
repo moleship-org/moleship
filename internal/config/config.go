@@ -128,6 +128,9 @@ func init() {
 		ROOTFUL = rootful
 	}
 
+	HOST_USER = getEnvOrDefault(EnvHostUser, "unknown")
+	HOST_UID = getEnvOrDefault(EnvHostUID, "")
+
 	if ROOTFUL {
 		handleRootfulConfig()
 	} else {
@@ -139,8 +142,6 @@ func init() {
 		PORT = uint16(p)
 	}
 
-	HOST_USER = getEnvOrDefault(EnvHostUser, "unknown")
-	HOST_UID = getEnvOrDefault(EnvHostUID, "")
 	LOG_LEVEL = getEnvOrDefault(EnvLogLevel, "info")
 	MODE = getEnvOrDefault(EnvMode, "debug")
 	PODMAN_SOCKET = getEnvOrDefault(EnvPodmanSocket, "/run/user/1000/podman/podman.sock")
@@ -197,7 +198,7 @@ func handleRootfulConfig() {
 }
 
 func handleRootlessConfig() {
-	homeDir := filepath.Join(string(os.PathListSeparator), "home", HOST_USER)
+	homeDir := filepath.Join(string(os.PathSeparator), "home", HOST_USER)
 	CONFIG_HOME = getEnvOrDefault(EnvConfigHome, filepath.Join(homeDir, ".config", "moleship"))
 	CACHE_HOME = getEnvOrDefault(EnvCacheHome, filepath.Join(homeDir, ".cache", "moleship"))
 	DATA_HOME = getEnvOrDefault(EnvDataHome, filepath.Join(homeDir, ".local", "share", "moleship"))

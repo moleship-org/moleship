@@ -42,3 +42,36 @@ func TestClassifyUnitError(t *testing.T) {
 		})
 	}
 }
+
+func TestClassifyReloadDaemonError(t *testing.T) {
+	tests := []struct {
+		name   string
+		stderr string
+		want   error
+	}{
+		{
+			name:   "permission denied",
+			stderr: "Failed to reload daemon: Permission denied",
+			want:   ErrPermissionDenied,
+		},
+		{
+			name:   "access denied",
+			stderr: "Failed to reload daemon: Access denied",
+			want:   ErrPermissionDenied,
+		},
+		{
+			name:   "generic failure",
+			stderr: "Failed to reload daemon: transport endpoint closed",
+			want:   ErrDaemonReloadFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := classifyReloadDaemonError(tt.stderr, errors.New("exit status 1"))
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected error %v, got %v", tt.want, err)
+			}
+		})
+	}
+}

@@ -134,9 +134,16 @@ func (s *Systemd) RestartUnit(ctx context.Context, unitName string) error {
 func (s *Systemd) ReloadDaemon(ctx context.Context) error {
 	stderr, err := s.runWithStderr(ctx, "daemon-reload")
 	if err != nil {
-		return fmt.Errorf("%w: %v (details: %s)", ErrDaemonReloadFailed, err, stderr)
+		return classifyReloadDaemonError(stderr, err)
 	}
 	return nil
+}
+
+func classifyReloadDaemonError(stderr string, err error) error {
+	if strings.Contains(stderr, "Permission denied") || strings.Contains(stderr, "Access denied") {
+		return ErrPermissionDenied
+	}
+	return fmt.Errorf("%w: %v (details: %s)", ErrDaemonReloadFailed, err, stderr)
 }
 
 func classifyUnitError(stderr string, err error) error {

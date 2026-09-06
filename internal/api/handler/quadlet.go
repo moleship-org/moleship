@@ -45,24 +45,50 @@ func (h *Quadlet) Mount(r chi.Router) {
 				})
 			})
 
-			// TODO: r.Route("/volumes", ...) / r.Route("/networks", ...) ...
+			r.Route("/volumes", func(r chi.Router) {
+				r.Get("/", h.ListVolumes)
+				r.Post("/", h.CreateVolume)
+
+				r.Route("/{name}", func(r chi.Router) {
+					r.Get("/", h.readHandler(quadlet.KindVolume))
+					r.Get("/status", h.statusHandler(quadlet.KindVolume))
+					r.Post("/start", h.startHandler(quadlet.KindVolume))
+					r.Post("/stop", h.stopHandler(quadlet.KindVolume))
+					r.Post("/restart", h.restartHandler(quadlet.KindVolume))
+					r.Delete("/", h.deleteHandler(quadlet.KindVolume))
+				})
+			})
 		})
 	})
 }
 
 // POST/quadlet/containers?fail_if_exists=<bool>
 func (h *Quadlet) CreateContainer(w http.ResponseWriter, r *http.Request) {
+	h.createUnit(w, r, &quadlet.ContainerUnit{}, "quadlet.container.create")
+}
+
+// POST/quadlet/volumes?fail_if_exists=<bool>
+func (h *Quadlet) CreateVolume(w http.ResponseWriter, r *http.Request) {
+	h.createUnit(w, r, &quadlet.VolumeUnit{}, "quadlet.volume.create")
+}
+
+func (h *Quadlet) createUnit(w http.ResponseWriter, r *http.Request, unit quadlet.Unit, action string) {
 	ctx := apiutil.From(w, r)
 
-	unit := &quadlet.ContainerUnit{}
-	if err := json.UnmarshalRead(r.Body, &unit); err != nil {
-		apiutil.AuditFailure(ctx, r, "quadlet.container.create", err)
+	if err := json.UnmarshalRead(r.Body, unit); err != nil {
+		apiutil.AuditFailure(ctx, r, action, err)
 		ctx.Error(http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 
-	if err := unit.Validate(); err != nil {
-		apiutil.AuditFailure(ctx, r, "quadlet.container.create", err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())))
+	validator, ok := unit.(interface{ Validate() error })
+	if !ok {
+		ctx.Error(http.StatusInternalServerError, "unit validation is not supported")
+		return
+	}
+
+	if err := validator.Validate(); err != nil {
+		apiutil.AuditFailure(ctx, r, action, err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())))
 		writeQuadletError(ctx, err)
 		return
 	}
@@ -73,7 +99,7 @@ func (h *Quadlet) CreateContainer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), unit, opts); err != nil {
-		apiutil.AuditFailure(ctx, r, "quadlet.container.create", err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())), slog.Bool("start", opts.Start), slog.Bool("fail_if_exists", opts.FailIfExists))
+		apiutil.AuditFailure(ctx, r, action, err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())), slog.Bool("start", opts.Start), slog.Bool("fail_if_exists", opts.FailIfExists))
 		writeQuadletError(ctx, err)
 		return
 	}
@@ -88,7 +114,7 @@ func (h *Quadlet) CreateContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiutil.AuditSuccess(ctx, r, "quadlet.container.create", slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())), slog.String("service_name", quadlet.ServiceName(unit)), slog.Bool("start", opts.Start), slog.Bool("fail_if_exists", opts.FailIfExists))
+	apiutil.AuditSuccess(ctx, r, action, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())), slog.String("service_name", quadlet.ServiceName(unit)), slog.Bool("start", opts.Start), slog.Bool("fail_if_exists", opts.FailIfExists))
 	ctx.JSONBlob(http.StatusCreated, body)
 }
 
@@ -220,6 +246,11 @@ func (h *Quadlet) List(w http.ResponseWriter, r *http.Request) {
 func (h *Quadlet) ListContainers(w http.ResponseWriter, r *http.Request) {
 	kind := quadlet.KindContainer
 	h.listByKind(w, r, &kind, "quadlet.container.list")
+}
+
+func (h *Quadlet) ListVolumes(w http.ResponseWriter, r *http.Request) {
+	kind := quadlet.KindVolume
+	h.listByKind(w, r, &kind, "quadlet.volume.list")
 }
 
 func (h *Quadlet) listByKind(w http.ResponseWriter, r *http.Request, kind *quadlet.Kind, action string) {
