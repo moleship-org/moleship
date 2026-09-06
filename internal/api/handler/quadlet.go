@@ -56,13 +56,13 @@ func (h *Quadlet) CreateContainer(w http.ResponseWriter, r *http.Request) {
 
 	unit := &quadlet.ContainerUnit{}
 	if err := json.UnmarshalRead(r.Body, &unit); err != nil {
-		auditFailure(ctx, r, "quadlet.container.create", err)
+		apiutil.AuditFailure(ctx, r, "quadlet.container.create", err)
 		ctx.Error(http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 
 	if err := unit.Validate(); err != nil {
-		auditFailure(ctx, r, "quadlet.container.create", err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())))
+		apiutil.AuditFailure(ctx, r, "quadlet.container.create", err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())))
 		writeQuadletError(ctx, err)
 		return
 	}
@@ -73,7 +73,7 @@ func (h *Quadlet) CreateContainer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), unit, opts); err != nil {
-		auditFailure(ctx, r, "quadlet.container.create", err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())), slog.Bool("start", opts.Start), slog.Bool("fail_if_exists", opts.FailIfExists))
+		apiutil.AuditFailure(ctx, r, "quadlet.container.create", err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())), slog.Bool("start", opts.Start), slog.Bool("fail_if_exists", opts.FailIfExists))
 		writeQuadletError(ctx, err)
 		return
 	}
@@ -88,7 +88,7 @@ func (h *Quadlet) CreateContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auditSuccess(ctx, r, "quadlet.container.create", slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())), slog.String("service_name", quadlet.ServiceName(unit)), slog.Bool("start", opts.Start), slog.Bool("fail_if_exists", opts.FailIfExists))
+	apiutil.AuditSuccess(ctx, r, "quadlet.container.create", slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())), slog.String("service_name", quadlet.ServiceName(unit)), slog.Bool("start", opts.Start), slog.Bool("fail_if_exists", opts.FailIfExists))
 	ctx.JSONBlob(http.StatusCreated, body)
 }
 
@@ -101,12 +101,12 @@ func (h *Quadlet) readHandler(kind quadlet.Kind) http.HandlerFunc {
 
 		content, err := h.svc.Read(r.Context(), kind, name)
 		if err != nil {
-			auditFailure(ctx, r, "quadlet.read", err, slog.String("name", name), slog.String("kind", string(kind)))
+			apiutil.AuditFailure(ctx, r, "quadlet.read", err, slog.String("name", name), slog.String("kind", string(kind)))
 			writeQuadletError(ctx, err)
 			return
 		}
 
-		auditSuccess(ctx, r, "quadlet.read", slog.String("name", name), slog.String("kind", string(kind)))
+		apiutil.AuditSuccess(ctx, r, "quadlet.read", slog.String("name", name), slog.String("kind", string(kind)))
 		ctx.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		ctx.Bytes(http.StatusOK, []byte(content))
 	}
@@ -118,12 +118,12 @@ func (h *Quadlet) deleteHandler(kind quadlet.Kind) http.HandlerFunc {
 		name := chi.URLParam(r, "name")
 
 		if err := h.svc.Remove(r.Context(), kind, name); err != nil {
-			auditFailure(ctx, r, "quadlet.delete", err, slog.String("name", name), slog.String("kind", string(kind)))
+			apiutil.AuditFailure(ctx, r, "quadlet.delete", err, slog.String("name", name), slog.String("kind", string(kind)))
 			writeQuadletError(ctx, err)
 			return
 		}
 
-		auditSuccess(ctx, r, "quadlet.delete", slog.String("name", name), slog.String("kind", string(kind)))
+		apiutil.AuditSuccess(ctx, r, "quadlet.delete", slog.String("name", name), slog.String("kind", string(kind)))
 		ctx.Status(http.StatusNoContent)
 	}
 }
@@ -135,7 +135,7 @@ func (h *Quadlet) statusHandler(kind quadlet.Kind) http.HandlerFunc {
 
 		status, err := h.svc.Status(r.Context(), kind, name)
 		if err != nil {
-			auditFailure(ctx, r, "quadlet.status", err, slog.String("name", name), slog.String("kind", string(kind)))
+			apiutil.AuditFailure(ctx, r, "quadlet.status", err, slog.String("name", name), slog.String("kind", string(kind)))
 			writeQuadletError(ctx, err)
 			return
 		}
@@ -150,7 +150,7 @@ func (h *Quadlet) statusHandler(kind quadlet.Kind) http.HandlerFunc {
 			return
 		}
 
-		auditSuccess(ctx, r, "quadlet.status", slog.String("name", name), slog.String("kind", string(kind)), slog.String("status", status))
+		apiutil.AuditSuccess(ctx, r, "quadlet.status", slog.String("name", name), slog.String("kind", string(kind)), slog.String("status", status))
 		ctx.JSONBlob(http.StatusOK, body)
 	}
 }
@@ -161,12 +161,12 @@ func (h *Quadlet) startHandler(kind quadlet.Kind) http.HandlerFunc {
 		name := chi.URLParam(r, "name")
 
 		if err := h.svc.Start(r.Context(), kind, name); err != nil {
-			auditFailure(ctx, r, "quadlet.start", err, slog.String("name", name), slog.String("kind", string(kind)))
+			apiutil.AuditFailure(ctx, r, "quadlet.start", err, slog.String("name", name), slog.String("kind", string(kind)))
 			writeQuadletError(ctx, err)
 			return
 		}
 
-		auditSuccess(ctx, r, "quadlet.start", slog.String("name", name), slog.String("kind", string(kind)))
+		apiutil.AuditSuccess(ctx, r, "quadlet.start", slog.String("name", name), slog.String("kind", string(kind)))
 		ctx.Status(http.StatusNoContent)
 	}
 }
@@ -177,12 +177,12 @@ func (h *Quadlet) stopHandler(kind quadlet.Kind) http.HandlerFunc {
 		name := chi.URLParam(r, "name")
 
 		if err := h.svc.Stop(r.Context(), kind, name); err != nil {
-			auditFailure(ctx, r, "quadlet.stop", err, slog.String("name", name), slog.String("kind", string(kind)))
+			apiutil.AuditFailure(ctx, r, "quadlet.stop", err, slog.String("name", name), slog.String("kind", string(kind)))
 			writeQuadletError(ctx, err)
 			return
 		}
 
-		auditSuccess(ctx, r, "quadlet.stop", slog.String("name", name), slog.String("kind", string(kind)))
+		apiutil.AuditSuccess(ctx, r, "quadlet.stop", slog.String("name", name), slog.String("kind", string(kind)))
 		ctx.Status(http.StatusNoContent)
 	}
 }
@@ -193,12 +193,12 @@ func (h *Quadlet) restartHandler(kind quadlet.Kind) http.HandlerFunc {
 		name := chi.URLParam(r, "name")
 
 		if err := h.svc.Restart(r.Context(), kind, name); err != nil {
-			auditFailure(ctx, r, "quadlet.restart", err, slog.String("name", name), slog.String("kind", string(kind)))
+			apiutil.AuditFailure(ctx, r, "quadlet.restart", err, slog.String("name", name), slog.String("kind", string(kind)))
 			writeQuadletError(ctx, err)
 			return
 		}
 
-		auditSuccess(ctx, r, "quadlet.restart", slog.String("name", name), slog.String("kind", string(kind)))
+		apiutil.AuditSuccess(ctx, r, "quadlet.restart", slog.String("name", name), slog.String("kind", string(kind)))
 		ctx.Status(http.StatusNoContent)
 	}
 }
@@ -227,7 +227,7 @@ func (h *Quadlet) listByKind(w http.ResponseWriter, r *http.Request, kind *quadl
 
 	entries, err := h.svc.List(r.Context())
 	if err != nil {
-		auditFailure(ctx, r, action, err)
+		apiutil.AuditFailure(ctx, r, action, err)
 		writeQuadletError(ctx, err)
 		return
 	}
@@ -256,7 +256,7 @@ func (h *Quadlet) listByKind(w http.ResponseWriter, r *http.Request, kind *quadl
 		return
 	}
 
-	auditSuccess(ctx, r, action, slog.Int("count", len(resp)))
+	apiutil.AuditSuccess(ctx, r, action, slog.Int("count", len(resp)))
 	ctx.Header().Set("Content-Type", "application/json")
 	ctx.Bytes(http.StatusOK, body)
 }

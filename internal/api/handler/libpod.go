@@ -48,7 +48,7 @@ func (h *Libpod) SocketAPI(w http.ResponseWriter, r *http.Request) {
 
 	if !h.enabled {
 		err := http.ErrNotSupported
-		auditFailure(ctx, r, "libpod.proxy", err, slog.String("proxy_path", path))
+		apiutil.AuditFailure(ctx, r, "libpod.proxy", err, slog.String("proxy_path", path))
 		ctx.Error(http.StatusForbidden, "libpod proxy is disabled")
 		return
 	}
@@ -58,7 +58,7 @@ func (h *Libpod) SocketAPI(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.pdm.RawCall(r.Context(), r.Method, libpodPath...)
 	if err != nil {
-		auditFailure(ctx, r, "libpod.proxy", err, slog.String("proxy_path", path))
+		apiutil.AuditFailure(ctx, r, "libpod.proxy", err, slog.String("proxy_path", path))
 		h.lg.Error("error trying to call podman socket", slog.String("error", err.Error()))
 		ctx.Error(http.StatusInternalServerError, "error trying to call podman socket")
 		return
@@ -72,16 +72,16 @@ func (h *Libpod) SocketAPI(w http.ResponseWriter, r *http.Request) {
 	if res.Body != nil {
 		b, err := io.ReadAll(res.Body)
 		if err != nil && err != io.EOF {
-			auditFailure(ctx, r, "libpod.proxy", err, slog.String("proxy_path", path))
+			apiutil.AuditFailure(ctx, r, "libpod.proxy", err, slog.String("proxy_path", path))
 			ctx.Error(http.StatusInternalServerError, "error when trying to read request body")
 			return
 		}
 
-		auditSuccess(ctx, r, "libpod.proxy", slog.String("proxy_path", path), slog.Int("status_code", res.StatusCode))
+		apiutil.AuditSuccess(ctx, r, "libpod.proxy", slog.String("proxy_path", path), slog.Int("status_code", res.StatusCode))
 		ctx.Bytes(res.StatusCode, b)
 		return
 	}
 
-	auditSuccess(ctx, r, "libpod.proxy", slog.String("proxy_path", path), slog.Int("status_code", res.StatusCode))
+	apiutil.AuditSuccess(ctx, r, "libpod.proxy", slog.String("proxy_path", path), slog.Int("status_code", res.StatusCode))
 	ctx.Status(res.StatusCode)
 }
