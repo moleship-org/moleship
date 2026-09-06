@@ -12,6 +12,8 @@ import (
 	"github.com/moleship-org/moleship/internal/services/auth/cookies"
 )
 
+var errUnexpectedSigningMethod = errors.New("unexpected jwt signing method")
+
 func RequireAuth(authService *authsvc.AuthService) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +26,7 @@ func RequireAuth(authService *authsvc.AuthService) func(next http.Handler) http.
 			claims := &authtoken.Claims{}
 			token, err := jwt.ParseWithClaims(cookie.Value, claims, func(token *jwt.Token) (interface{}, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, http.ErrAbortHandler
+					return nil, errUnexpectedSigningMethod
 				}
 				return config.JWT_SECRET, nil
 			})

@@ -56,7 +56,7 @@ func (h *Libpod) SocketAPI(w http.ResponseWriter, r *http.Request) {
 	libpodPath := strings.Split(path, "/")
 	libpodPath = append(libpodPath, "?", r.URL.Query().Encode())
 
-	res, err := h.pdm.RawCall(r.Context(), r.Method, libpodPath...)
+	res, err := h.pdm.RawCall(r.Context(), r.Method, r.Body, r.Header, libpodPath...)
 	if err != nil {
 		apiutil.AuditFailure(ctx, r, "libpod.proxy", err, slog.String("proxy_path", path))
 		h.lg.Error("error trying to call podman socket", slog.String("error", err.Error()))

@@ -8,8 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/moleship-org/moleship/internal/config"
 )
 
 const (
@@ -207,7 +205,12 @@ func defaultDir(userMode bool) (string, error) {
 	if !userMode {
 		return rootDir, nil
 	}
-	return filepath.Join(string(os.PathSeparator), "home", config.HOST_USER, ".config", "containers", "systemd"), nil
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	return filepath.Join(homeDir, ".config", "containers", "systemd"), nil
 }
 
 func validateName(name string) error {

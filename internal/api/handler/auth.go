@@ -56,15 +56,9 @@ func (h *Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.svc.IsConfigured() {
-		apiutil.AuditFailure(c, r, "auth.login", auth.ErrNotConfigured, slog.String("username", body.Username))
-		c.Error(http.StatusPreconditionFailed, "instance not configured yet")
-		return
-	}
-
 	if err := h.svc.Verify(body.Username, body.Password); err != nil {
 		apiutil.AuditFailure(c, r, "auth.login", err, slog.String("username", body.Username))
-		if !errors.Is(err, auth.ErrInvalidCredentials) && !errors.Is(err, auth.ErrNotConfigured) {
+		if !errors.Is(err, auth.ErrInvalidCredentials) {
 			h.lg.Error("auth verify error", slog.String("error", err.Error()))
 		}
 		c.Error(http.StatusUnauthorized, "unauthorized")

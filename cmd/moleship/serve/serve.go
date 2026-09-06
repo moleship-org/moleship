@@ -8,8 +8,6 @@ import (
 	"github.com/moleship-org/moleship/internal/app"
 	"github.com/moleship-org/moleship/internal/config"
 	"github.com/spf13/cobra"
-
-	_ "github.com/moleship-org/moleship/internal/config"
 )
 
 var (
@@ -51,6 +49,11 @@ var cmd = &cobra.Command{
 
 func Command() *cobra.Command {
 	cmd.Flags().Uint16VarP(&port, "port", "p", 0, "use to listen and serve")
+	cmd.Flags().DurationVar(&readTimeout, "read-timeout", 0, "http server read timeout")
+	cmd.Flags().DurationVar(&writeTimeout, "write-timeout", 0, "http server write timeout")
+	cmd.Flags().DurationVar(&idleTimeout, "idle-timeout", 0, "http server idle timeout")
+	cmd.Flags().IntVar(&maxHeaderBytes, "max-header-bytes", 0, "http server max header bytes")
+	cmd.Flags().DurationVar(&shutdownTimeout, "shutdown-timeout", 0, "graceful shutdown timeout")
 	return cmd
 }
 

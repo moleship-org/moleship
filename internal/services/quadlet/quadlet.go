@@ -45,6 +45,10 @@ func (s *QuadletService) Create(ctx context.Context, unit Unit, opts CreateOptio
 }
 
 func (s *QuadletService) Remove(ctx context.Context, kind Kind, name string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+
 	serviceName := kind.ServiceName(name)
 
 	if err := s.systemd.StopUnit(ctx, serviceName); err != nil && !errors.Is(err, systemd.ErrUnitNotFound) {
@@ -59,18 +63,30 @@ func (s *QuadletService) Remove(ctx context.Context, kind Kind, name string) err
 }
 
 func (s *QuadletService) Start(ctx context.Context, kind Kind, name string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
 	return s.systemd.StartUnit(ctx, kind.ServiceName(name))
 }
 
 func (s *QuadletService) Stop(ctx context.Context, kind Kind, name string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
 	return s.systemd.StopUnit(ctx, kind.ServiceName(name))
 }
 
 func (s *QuadletService) Restart(ctx context.Context, kind Kind, name string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
 	return s.systemd.RestartUnit(ctx, kind.ServiceName(name))
 }
 
 func (s *QuadletService) Status(ctx context.Context, kind Kind, name string) (string, error) {
+	if err := validateName(name); err != nil {
+		return "", err
+	}
 	return s.systemd.UnitStatus(ctx, kind.ServiceName(name))
 }
 

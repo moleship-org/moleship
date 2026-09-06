@@ -64,12 +64,15 @@ func (p *Podman) getEndpoint(params ...string) string {
 	return uri
 }
 
-func (p *Podman) RawCall(ctx context.Context, method string, path ...string) (*http.Response, error) {
+func (p *Podman) RawCall(ctx context.Context, method string, body io.Reader, header http.Header, path ...string) (*http.Response, error) {
 	endpoint := p.getEndpoint(path...)
 
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	if header != nil {
+		req.Header = header.Clone()
 	}
 
 	res, err := p.client.Do(req)
@@ -97,7 +100,7 @@ func decodePodmanError(res *http.Response) error {
 }
 
 func (p *Podman) Ping(ctx context.Context) (http.Header, error) {
-	res, err := p.RawCall(ctx, http.MethodGet, "_ping")
+	res, err := p.RawCall(ctx, http.MethodGet, nil, nil, "_ping")
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +114,7 @@ func (p *Podman) Ping(ctx context.Context) (http.Header, error) {
 }
 
 func (p *Podman) GetVersion(ctx context.Context) (*entities.ComponentVersion, error) {
-	res, err := p.RawCall(ctx, http.MethodGet, "version")
+	res, err := p.RawCall(ctx, http.MethodGet, nil, nil, "version")
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +137,7 @@ func (p *Podman) ListContainers(ctx context.Context, opts url.Values) ([]entitie
 		opts = make(url.Values)
 	}
 
-	res, err := p.RawCall(ctx, http.MethodGet, "containers", "json", "?", opts.Encode())
+	res, err := p.RawCall(ctx, http.MethodGet, nil, nil, "containers", "json", "?", opts.Encode())
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +156,7 @@ func (p *Podman) ListContainers(ctx context.Context, opts url.Values) ([]entitie
 }
 
 func (p *Podman) Exists(ctx context.Context, name string) (bool, error) {
-	res, err := p.RawCall(ctx, http.MethodGet, "containers", name, "exists")
+	res, err := p.RawCall(ctx, http.MethodGet, nil, nil, "containers", name, "exists")
 	if err != nil {
 		return false, err
 	}
@@ -170,7 +173,7 @@ func (p *Podman) Exists(ctx context.Context, name string) (bool, error) {
 }
 
 func (p *Podman) Stats(ctx context.Context, name string) (*entities.ContainerStatReport, error) {
-	res, err := p.RawCall(ctx, http.MethodGet, "containers", name, "stats", "?stream=false")
+	res, err := p.RawCall(ctx, http.MethodGet, nil, nil, "containers", name, "stats", "?stream=false")
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +202,7 @@ func (p *Podman) Logs(ctx context.Context, name string, opts url.Values) (io.Rea
 		opts = make(url.Values)
 	}
 
-	res, err := p.RawCall(ctx, http.MethodGet, "containers", name, "logs", "?", opts.Encode())
+	res, err := p.RawCall(ctx, http.MethodGet, nil, nil, "containers", name, "logs", "?", opts.Encode())
 	if err != nil {
 		return nil, err
 	}

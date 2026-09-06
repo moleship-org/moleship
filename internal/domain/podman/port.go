@@ -13,8 +13,8 @@ import (
 // It abstracts low-level Podman operations, including raw API calls, connectivity checks,
 // version retrieval, container management, and resource monitoring.
 type Port interface {
-	// RawCall performs a direct HTTP call to the Podman socket API.
-	RawCall(ctx context.Context, method string, path ...string) (*http.Response, error)
+	// RawCall performs a direct HTTP call to the Podman socket API. body and header may be nil for requests without a payload.
+	RawCall(ctx context.Context, method string, body io.Reader, header http.Header, path ...string) (*http.Response, error)
 
 	// Ping checks the connectivity to the Podman service.
 	Ping(ctx context.Context) (http.Header, error)

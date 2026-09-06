@@ -180,7 +180,7 @@ func (s *AuthService) applyNewPasswordLocked(password string) error {
 	creds := &credentials{
 		User:      s.user,
 		Hash:      string(hash),
-		ChangedAt: time.Now().UTC(),
+		ChangedAt: time.Now().UTC().Truncate(time.Second),
 	}
 
 	if err := s.persist(creds); err != nil {
@@ -241,7 +241,24 @@ func (s *AuthService) Verify(user, password string) error {
 	s.mu.RUnlock()
 
 	if creds == nil {
-		return ErrNotConfigured
+		if user != s.user {
+			return ErrInvalidUser
+		}
+		if strings.TrimSpace(password) == "" {
+			return ErrInvalidPassword
+		}
+
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		if s.creds != nil {
+			creds = s.creds
+		} else {
+			if err := s.applyNewPasswordLocked(password); err != nil {
+				return err
+			}
+			return nil
+		}
 	}
 
 	if creds.User != user {

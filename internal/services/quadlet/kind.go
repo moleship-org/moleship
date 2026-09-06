@@ -42,6 +42,8 @@ func (k Kind) ServiceSuffix() string {
 		return "-volume"
 	case KindNetwork:
 		return "-network"
+	case KindImage:
+		return "-image"
 	default:
 		return ""
 	}

@@ -58,6 +58,34 @@ func (h *Quadlet) Mount(r chi.Router) {
 					r.Delete("/", h.deleteHandler(quadlet.KindVolume))
 				})
 			})
+
+			r.Route("/networks", func(r chi.Router) {
+				r.Get("/", h.ListNetworks)
+				r.Post("/", h.CreateNetwork)
+
+				r.Route("/{name}", func(r chi.Router) {
+					r.Get("/", h.readHandler(quadlet.KindNetwork))
+					r.Get("/status", h.statusHandler(quadlet.KindNetwork))
+					r.Post("/start", h.startHandler(quadlet.KindNetwork))
+					r.Post("/stop", h.stopHandler(quadlet.KindNetwork))
+					r.Post("/restart", h.restartHandler(quadlet.KindNetwork))
+					r.Delete("/", h.deleteHandler(quadlet.KindNetwork))
+				})
+			})
+
+			r.Route("/images", func(r chi.Router) {
+				r.Get("/", h.ListImages)
+				r.Post("/", h.CreateImage)
+
+				r.Route("/{name}", func(r chi.Router) {
+					r.Get("/", h.readHandler(quadlet.KindImage))
+					r.Get("/status", h.statusHandler(quadlet.KindImage))
+					r.Post("/start", h.startHandler(quadlet.KindImage))
+					r.Post("/stop", h.stopHandler(quadlet.KindImage))
+					r.Post("/restart", h.restartHandler(quadlet.KindImage))
+					r.Delete("/", h.deleteHandler(quadlet.KindImage))
+				})
+			})
 		})
 	})
 }
@@ -70,6 +98,16 @@ func (h *Quadlet) CreateContainer(w http.ResponseWriter, r *http.Request) {
 // POST/quadlet/volumes?fail_if_exists=<bool>
 func (h *Quadlet) CreateVolume(w http.ResponseWriter, r *http.Request) {
 	h.createUnit(w, r, &quadlet.VolumeUnit{}, "quadlet.volume.create")
+}
+
+// POST/quadlet/networks?fail_if_exists=<bool>
+func (h *Quadlet) CreateNetwork(w http.ResponseWriter, r *http.Request) {
+	h.createUnit(w, r, &quadlet.NetworkUnit{}, "quadlet.network.create")
+}
+
+// POST/quadlet/images?fail_if_exists=<bool>
+func (h *Quadlet) CreateImage(w http.ResponseWriter, r *http.Request) {
+	h.createUnit(w, r, &quadlet.ImageUnit{}, "quadlet.image.create")
 }
 
 func (h *Quadlet) createUnit(w http.ResponseWriter, r *http.Request, unit quadlet.Unit, action string) {
@@ -251,6 +289,16 @@ func (h *Quadlet) ListContainers(w http.ResponseWriter, r *http.Request) {
 func (h *Quadlet) ListVolumes(w http.ResponseWriter, r *http.Request) {
 	kind := quadlet.KindVolume
 	h.listByKind(w, r, &kind, "quadlet.volume.list")
+}
+
+func (h *Quadlet) ListNetworks(w http.ResponseWriter, r *http.Request) {
+	kind := quadlet.KindNetwork
+	h.listByKind(w, r, &kind, "quadlet.network.list")
+}
+
+func (h *Quadlet) ListImages(w http.ResponseWriter, r *http.Request) {
+	kind := quadlet.KindImage
+	h.listByKind(w, r, &kind, "quadlet.image.list")
 }
 
 func (h *Quadlet) listByKind(w http.ResponseWriter, r *http.Request, kind *quadlet.Kind, action string) {

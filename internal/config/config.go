@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -151,11 +152,15 @@ func init() {
 	}
 	SYSTEMCTL_PATH = getEnvOrDefault(EnvSystemctlPath, "/usr/bin/systemctl")
 
-	secret, err := getOrCreateJWTSecret(DATA_HOME)
-	if err != nil {
-		panic("provide a MOLESHIP_JWT_SECRET or create a jwt_secret.key file at MOLESHIP_DATA_HOME")
+	if envSecret := getEnvOrDefault(EnvJWTSecret, ""); envSecret != "" {
+		JWT_SECRET = []byte(envSecret)
+	} else {
+		secret, err := getOrCreateJWTSecret(DATA_HOME)
+		if err != nil {
+			panic("provide a MOLESHIP_JWT_SECRET or create a jwt_secret.key file at MOLESHIP_DATA_HOME")
+		}
+		JWT_SECRET = secret
 	}
-	JWT_SECRET = secret
 
 	allowedOrg := strings.TrimSpace(getEnvOrDefault(EnvAllowedOrigins, ""))
 	if allowedOrg != "" {
@@ -198,7 +203,11 @@ func handleRootfulConfig() {
 }
 
 func handleRootlessConfig() {
-	homeDir := filepath.Join(string(os.PathSeparator), "home", HOST_USER)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic("Failed to get user home directory: " + err.Error())
+	}
+
 	CONFIG_HOME = getEnvOrDefault(EnvConfigHome, filepath.Join(homeDir, ".config", "moleship"))
 	CACHE_HOME = getEnvOrDefault(EnvCacheHome, filepath.Join(homeDir, ".cache", "moleship"))
 	DATA_HOME = getEnvOrDefault(EnvDataHome, filepath.Join(homeDir, ".local", "share", "moleship"))
@@ -217,7 +226,11 @@ func makeDirIfNotExists(path string) error {
 func getOrCreateJWTSecret(dataHome string) ([]byte, error) {
 	secretPath := filepath.Join(dataHome, "jwt_secret.key")
 
-	if secret, err := os.ReadFile(secretPath); err == nil {
+	if encoded, err := os.ReadFile(secretPath); err == nil {
+		secret, decodeErr := base64.RawStdEncoding.DecodeString(string(encoded))
+		if decodeErr != nil {
+			return nil, fmt.Errorf("failed to decode jwt_secret.key: %w", decodeErr)
+		}
 		return secret, nil
 	}
 

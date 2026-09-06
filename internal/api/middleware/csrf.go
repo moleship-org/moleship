@@ -12,7 +12,7 @@ const csrfHeaderName = "X-CSRF-Token"
 func RequireCSRF() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !requiresCSRFFCheck(r.Method) {
+			if !requiresCSRFCheck(r.Method) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -45,7 +45,7 @@ func RequireCSRF() func(next http.Handler) http.Handler {
 	}
 }
 
-func requiresCSRFFCheck(method string) bool {
+func requiresCSRFCheck(method string) bool {
 	switch method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
 		return true
