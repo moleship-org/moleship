@@ -12,6 +12,7 @@ build/
 bin/
 _output/
 .gocache
+.cache
 
 # Git Worktrees
 worktrees/
