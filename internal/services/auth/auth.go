@@ -241,26 +241,38 @@ func (s *AuthService) Verify(user, password string) error {
 	s.mu.RUnlock()
 
 	if creds == nil {
-		if user != s.user {
-			return ErrInvalidUser
-		}
-		if strings.TrimSpace(password) == "" {
-			return ErrInvalidPassword
-		}
-
-		s.mu.Lock()
-		defer s.mu.Unlock()
-
-		if s.creds != nil {
-			creds = s.creds
-		} else {
-			if err := s.applyNewPasswordLocked(password); err != nil {
-				return err
-			}
-			return nil
-		}
+		return s.bootstrapFirstLogin(user, password)
 	}
 
+	return compareCredentials(creds, user, password)
+}
+
+// bootstrapFirstLogin handles authentication when no credentials have been
+// configured yet. The first successful attempt against the configured host
+// user permanently sets the supplied password as the admin credential, which
+// lets a fresh installation be bootstrapped without a separate "set password"
+// step. If credentials are configured concurrently by another request before
+// this one acquires the lock, it falls back to verifying against them instead
+// of overwriting them.
+func (s *AuthService) bootstrapFirstLogin(user, password string) error {
+	if user != s.user {
+		return ErrInvalidUser
+	}
+	if strings.TrimSpace(password) == "" {
+		return ErrInvalidPassword
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.creds != nil {
+		return compareCredentials(s.creds, user, password)
+	}
+
+	return s.applyNewPasswordLocked(password)
+}
+
+func compareCredentials(creds *credentials, user, password string) error {
 	if creds.User != user {
 		return ErrInvalidUser
 	}

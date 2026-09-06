@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json/v2"
-	"errors"
 	"log/slog"
 	"net/http"
 
@@ -343,23 +342,14 @@ func (h *Quadlet) listByKind(w http.ResponseWriter, r *http.Request, kind *quadl
 // --- Error mapping ---
 
 func writeQuadletError(ctx apiutil.Context, err error) {
-	ctx.Logger().Error("Quadlet endpoint error", slog.String("error", err.Error()))
-
-	switch {
-	case errors.Is(err, quadlet.ErrInvalidUnit),
-		errors.Is(err, quadlet.ErrInvalidName),
-		errors.Is(err, quadlet.ErrInvalidKind):
-		ctx.Error(http.StatusBadRequest, err.Error())
-	case errors.Is(err, quadlet.ErrUnitAlreadyExists):
-		ctx.Error(http.StatusConflict, "unit already exists")
-	case errors.Is(err, quadlet.ErrUnitNotFound),
-		errors.Is(err, systemd.ErrUnitNotFound):
-		ctx.Error(http.StatusNotFound, "unit not found")
-	case errors.Is(err, systemd.ErrPermissionDenied):
-		ctx.Error(http.StatusForbidden, "permission denied")
-	case errors.Is(err, systemd.ErrCommandFailed):
-		ctx.Error(http.StatusBadGateway, "systemd failed to apply the unit change; check `systemctl --user status` and `journalctl --user -xeu` for the service")
-	default:
-		ctx.Error(http.StatusInternalServerError, "unexpected error")
-	}
+	apiutil.WriteMappedError(ctx, "Quadlet endpoint error", err, "unexpected error",
+		apiutil.ErrorMapping{Target: quadlet.ErrInvalidUnit, Status: http.StatusBadRequest},
+		apiutil.ErrorMapping{Target: quadlet.ErrInvalidName, Status: http.StatusBadRequest},
+		apiutil.ErrorMapping{Target: quadlet.ErrInvalidKind, Status: http.StatusBadRequest},
+		apiutil.ErrorMapping{Target: quadlet.ErrUnitAlreadyExists, Status: http.StatusConflict, Message: "unit already exists"},
+		apiutil.ErrorMapping{Target: quadlet.ErrUnitNotFound, Status: http.StatusNotFound, Message: "unit not found"},
+		apiutil.ErrorMapping{Target: systemd.ErrUnitNotFound, Status: http.StatusNotFound, Message: "unit not found"},
+		apiutil.ErrorMapping{Target: systemd.ErrPermissionDenied, Status: http.StatusForbidden, Message: "permission denied"},
+		apiutil.ErrorMapping{Target: systemd.ErrCommandFailed, Status: http.StatusBadGateway, Message: "systemd failed to apply the unit change; check `systemctl --user status` and `journalctl --user -xeu` for the service"},
+	)
 }

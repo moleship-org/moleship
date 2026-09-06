@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json/v2"
-	"errors"
 	"log/slog"
 	"net/http"
 
@@ -47,7 +46,7 @@ func (h *Systemd) UnitStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := h.sys.UnitStatus(r.Context(), unit)
 	if err != nil {
 		apiutil.AuditFailure(ctx, r, "systemd.unit.status", err, slog.String("unit", unit))
-		writeError(ctx, err)
+		writeSystemdError(ctx, err)
 		return
 	}
 
@@ -70,7 +69,7 @@ func (h *Systemd) StartUnit(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.sys.StartUnit(r.Context(), unit); err != nil {
 		apiutil.AuditFailure(ctx, r, "systemd.unit.start", err, slog.String("unit", unit))
-		writeError(ctx, err)
+		writeSystemdError(ctx, err)
 		return
 	}
 
@@ -84,7 +83,7 @@ func (h *Systemd) StopUnit(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.sys.StopUnit(r.Context(), unit); err != nil {
 		apiutil.AuditFailure(ctx, r, "systemd.unit.stop", err, slog.String("unit", unit))
-		writeError(ctx, err)
+		writeSystemdError(ctx, err)
 		return
 	}
 
@@ -98,7 +97,7 @@ func (h *Systemd) RestartUnit(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.sys.RestartUnit(r.Context(), unit); err != nil {
 		apiutil.AuditFailure(ctx, r, "systemd.unit.restart", err, slog.String("unit", unit))
-		writeError(ctx, err)
+		writeSystemdError(ctx, err)
 		return
 	}
 
@@ -111,7 +110,7 @@ func (h *Systemd) ReloadDaemon(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.sys.ReloadDaemon(r.Context()); err != nil {
 		apiutil.AuditFailure(ctx, r, "systemd.daemon_reload", err)
-		writeError(ctx, err)
+		writeSystemdError(ctx, err)
 		return
 	}
 
@@ -119,19 +118,11 @@ func (h *Systemd) ReloadDaemon(w http.ResponseWriter, r *http.Request) {
 	ctx.Status(http.StatusNoContent)
 }
 
-func writeError(ctx apiutil.Context, err error) {
-	ctx.Logger().Error("Systemd endpoint error", slog.String("error", err.Error()))
-
-	switch {
-	case errors.Is(err, systemd.ErrUnitNotFound):
-		ctx.Error(http.StatusNotFound, "unit not found")
-	case errors.Is(err, systemd.ErrPermissionDenied):
-		ctx.Error(http.StatusForbidden, "permission denied")
-	case errors.Is(err, systemd.ErrDaemonReloadFailed):
-		ctx.Error(http.StatusInternalServerError, "daemon-reload failed")
-	case errors.Is(err, systemd.ErrCommandFailed):
-		ctx.Error(http.StatusBadGateway, "systemd command failed; check `systemctl --user status <unit>` and `journalctl --user -xeu <unit>` for details")
-	default:
-		ctx.Error(http.StatusInternalServerError, "unexpected error calling systemd")
-	}
+func writeSystemdError(ctx apiutil.Context, err error) {
+	apiutil.WriteMappedError(ctx, "Systemd endpoint error", err, "unexpected error calling systemd",
+		apiutil.ErrorMapping{Target: systemd.ErrUnitNotFound, Status: http.StatusNotFound, Message: "unit not found"},
+		apiutil.ErrorMapping{Target: systemd.ErrPermissionDenied, Status: http.StatusForbidden, Message: "permission denied"},
+		apiutil.ErrorMapping{Target: systemd.ErrDaemonReloadFailed, Status: http.StatusInternalServerError, Message: "daemon-reload failed"},
+		apiutil.ErrorMapping{Target: systemd.ErrCommandFailed, Status: http.StatusBadGateway, Message: "systemd command failed; check `systemctl --user status <unit>` and `journalctl --user -xeu <unit>` for details"},
+	)
 }
