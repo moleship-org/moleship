@@ -197,11 +197,7 @@ func handleRootfulConfig() {
 }
 
 func handleRootlessConfig() {
-	homeDir := filepath.Join("home", HOST_USER)
-	if err := makeDirIfNotExists(homeDir); err != nil {
-		panic("Failed to create the home directory: " + homeDir + " - " + err.Error())
-	}
-
+	homeDir := filepath.Join(string(os.PathListSeparator), "home", HOST_USER)
 	CONFIG_HOME = getEnvOrDefault(EnvConfigHome, filepath.Join(homeDir, ".config", "moleship"))
 	CACHE_HOME = getEnvOrDefault(EnvCacheHome, filepath.Join(homeDir, ".cache", "moleship"))
 	DATA_HOME = getEnvOrDefault(EnvDataHome, filepath.Join(homeDir, ".local", "share", "moleship"))

@@ -158,8 +158,8 @@ func (a *Application) MountRoutes() error {
 			})
 
 			r.Group(func(r chi.Router) {
-				//r.Use(middleware.RequireAuth(a.authSvc))
-				//r.Use(middleware.RequireCSRF())
+				r.Use(middleware.RequireAuth(a.authSvc))
+				r.Use(middleware.RequireCSRF())
 
 				libpodHandler.Mount(r)
 				systemdHandler.Mount(r)

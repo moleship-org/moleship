@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/moleship-org/moleship/internal/config"
 )
 
 const (
@@ -205,16 +207,7 @@ func defaultDir(userMode bool) (string, error) {
 	if !userMode {
 		return rootDir, nil
 	}
-
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "containers", "systemd"), nil
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config", "containers", "systemd"), nil
+	return filepath.Join(string(os.PathSeparator), "home", config.HOST_USER, ".config", "containers", "systemd"), nil
 }
 
 func validateName(name string) error {
