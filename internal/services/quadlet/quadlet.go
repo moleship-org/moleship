@@ -36,8 +36,21 @@ func (s *QuadletService) Create(ctx context.Context, unit Unit, opts CreateOptio
 	}
 
 	if opts.Start {
-		if err := s.systemd.StartUnit(ctx, ServiceName(unit)); err != nil {
+		serviceName := ServiceName(unit)
+
+		status, err := s.systemd.UnitStatus(ctx, serviceName)
+		if err != nil && !errors.Is(err, systemd.ErrUnitNotFound) {
 			return err
+		}
+
+		if status == "active" {
+			if err := s.systemd.RestartUnit(ctx, serviceName); err != nil {
+				return err
+			}
+		} else {
+			if err := s.systemd.StartUnit(ctx, serviceName); err != nil {
+				return err
+			}
 		}
 	}
 

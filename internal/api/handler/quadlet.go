@@ -118,13 +118,7 @@ func (h *Quadlet) createUnit(w http.ResponseWriter, r *http.Request, unit quadle
 		return
 	}
 
-	validator, ok := unit.(interface{ Validate() error })
-	if !ok {
-		ctx.Error(http.StatusInternalServerError, "unit validation is not supported")
-		return
-	}
-
-	if err := validator.Validate(); err != nil {
+	if err := unit.Validate(); err != nil {
 		apiutil.AuditFailure(ctx, r, action, err, slog.String("name", unit.Name()), slog.String("kind", string(unit.Kind())))
 		writeQuadletError(ctx, err)
 		return

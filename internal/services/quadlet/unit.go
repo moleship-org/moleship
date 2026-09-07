@@ -6,6 +6,8 @@ type Unit interface {
 	Kind() Kind
 
 	Render() (string, error)
+
+	Validate() error
 }
 
 func Filename(u Unit) string {
