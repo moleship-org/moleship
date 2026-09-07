@@ -31,7 +31,7 @@ if [[ ${DEBUG:-} = "1" ]]; then
     GCFLAGS="all=-N -l"
 fi
 
-export CGO_ENABLED=0
+export CGO_ENABLED=1
 
 LDFLAGS="-s -w"
 
