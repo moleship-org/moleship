@@ -17,4 +17,10 @@ var (
 
 	// ErrCommandFailed indicates a generic execution error from the systemctl command.
 	ErrCommandFailed = errors.New("systemd command execution failed")
+
+	// ErrUnitTransientOrGenerated indicates the unit was produced by a systemd generator
+	// (e.g. Podman Quadlet) and therefore cannot be enabled or disabled via systemctl.
+	// Such units must have their [Install] section (WantedBy=, RequiredBy=, Alias=)
+	// configured in their source definition instead.
+	ErrUnitTransientOrGenerated = errors.New("unit is transient or generated and cannot be enabled/disabled directly")
 )

@@ -16,6 +16,14 @@ type Port interface {
 	// RestartUnit restarts the specified systemd unit. Returns an error if the restart operation fails.
 	RestartUnit(ctx context.Context, unitName string) error
 
+	// EnableUnit enables the specified systemd unit, so it starts automatically at boot.
+	// Returns an error if the enable operation fails.
+	EnableUnit(ctx context.Context, unitName string) error
+
+	// DisableUnit disables the specified systemd unit, so it no longer starts automatically at boot.
+	// Returns an error if the disable operation fails.
+	DisableUnit(ctx context.Context, unitName string) error
+
 	// ReloadDaemon reloads the systemd manager configuration (equivalent to `systemctl daemon-reload`).
 	// Returns an error if the reload operation fails.
 	ReloadDaemon(ctx context.Context) error

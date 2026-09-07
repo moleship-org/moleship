@@ -31,6 +31,11 @@ func TestClassifyUnitError(t *testing.T) {
 			stderr: "Failed to stop foo.service: Access denied.",
 			want:   ErrPermissionDenied,
 		},
+		{
+			name:   "transient or generated unit",
+			stderr: "Failed to enable unit: Unit /run/user/1000/systemd/generator/server.service is transient or generated.",
+			want:   ErrUnitTransientOrGenerated,
+		},
 	}
 
 	for _, tt := range tests {

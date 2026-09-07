@@ -131,6 +131,22 @@ func (s *Systemd) RestartUnit(ctx context.Context, unitName string) error {
 	return nil
 }
 
+func (s *Systemd) EnableUnit(ctx context.Context, unitName string) error {
+	stderr, err := s.runWithStderr(ctx, "enable", unitName)
+	if err != nil {
+		return classifyUnitError(stderr, err)
+	}
+	return nil
+}
+
+func (s *Systemd) DisableUnit(ctx context.Context, unitName string) error {
+	stderr, err := s.runWithStderr(ctx, "disable", unitName)
+	if err != nil {
+		return classifyUnitError(stderr, err)
+	}
+	return nil
+}
+
 func (s *Systemd) ReloadDaemon(ctx context.Context) error {
 	stderr, err := s.runWithStderr(ctx, "daemon-reload")
 	if err != nil {
@@ -154,6 +170,9 @@ func classifyUnitError(stderr string, err error) error {
 	}
 	if strings.Contains(stderr, "Permission denied") || strings.Contains(stderr, "Access denied") {
 		return ErrPermissionDenied
+	}
+	if strings.Contains(stderr, "transient or generated") {
+		return ErrUnitTransientOrGenerated
 	}
 	return fmt.Errorf("%w: %v (details: %s)", ErrCommandFailed, err, stderr)
 }
