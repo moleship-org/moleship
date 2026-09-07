@@ -9,6 +9,7 @@ Core dependencies:
 * systemd 257+
 * podman v5+
 * go v1.27+
+* gpgme 1.24+
 
 ### Debian/Ubuntu Install
 
