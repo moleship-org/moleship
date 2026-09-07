@@ -14,7 +14,7 @@ Core dependencies:
 ### Debian/Ubuntu Install
 
 ```sh
-apt install -y podman podman-compose
+apt install -y podman podman-compose libgpgme-de
 ```
 
 ## Building
