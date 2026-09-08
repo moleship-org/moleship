@@ -1,0 +1,71 @@
+# Quadlet unit for moleship itself.
+#
+# Install this file under ~/.config/containers/systemd/ (rootless) and enable
+# lingering for the user so the session survives logout:
+#
+#   loginctl enable-linger "$(whoami)"
+#   systemctl --user daemon-reload
+#   systemctl --user start moleship.service
+#
+# Requires the user's Podman socket to be active:
+#
+#   systemctl --user enable --now podman.socket
+#
+# This unit assumes rootless mode (MOLESHIP_ROOTFUL=false, the default). For
+# rootful deployments, install under /etc/containers/systemd/ instead, drop
+# User=/UserNS=/XDG_RUNTIME_DIR/DBUS_SESSION_BUS_ADDRESS, mount /run/dbus and
+# /var/run/podman.sock instead of %t, and use the rootful default paths
+# (/etc/moleship, /var/lib/moleship, /var/cache/moleship,
+# /etc/containers/systemd).
+#
+# This unit intentionally runs moleship in its default "debug" mode (no
+# MOLESHIP_MODE override below) because it terminates plain HTTP with no
+# TLS. "release" mode marks the session/CSRF cookies Secure, which no
+# client will store/send over plain HTTP -- login would appear to succeed
+# but every subsequent authenticated request would fail.
+
+[Unit]
+Description=Moleship - Quadlet management API for Podman (rootless)
+Wants=podman.socket
+After=podman.socket
+
+[Container]
+Image=localhost/moleship:latest
+ContainerName=moleship
+
+# Run as the same UID as the owning user, mapped 1:1 into the container via
+# keep-id, so moleship can access this user's systemd session bus and
+# Podman socket.
+User=%U:%U
+UserNS=keep-id
+
+# %t expands to $XDG_RUNTIME_DIR for a user manager (e.g. /run/user/1000),
+# which contains both the D-Bus session socket (bus) and the Podman socket
+# (podman/podman.sock).
+Volume=%t:%t
+Environment=XDG_RUNTIME_DIR=%t
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=%t/bus
+Environment=MOLESHIP_HOST_UID=%U
+Environment=MOLESHIP_HOST_USER=%u
+Environment=MOLESHIP_PODMAN_SOCKET=%t/podman/podman.sock
+
+# Default CORS allow-list: covers a browser running on this same machine
+# (localhost/127.0.0.1). Safe to leave in place regardless of
+# MOLESHIP_MODE.
+Environment=MOLESHIP_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+
+# Persist moleship's own state (JWT secret, cache, config) and make the
+# quadlet files it writes visible to this user's systemd instance.
+Volume=%h/.config/moleship:/home/moleship/.config/moleship
+Volume=%h/.cache/moleship:/home/moleship/.cache/moleship
+Volume=%h/.local/share/moleship:/home/moleship/.local/share/moleship
+Volume=%h/.config/containers/systemd:/home/moleship/.config/containers/systemd
+
+PublishPort=5000:5000
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=30
+
+[Install]
+WantedBy=default.target
