@@ -44,7 +44,8 @@ ARG TARGETARCH=amd64
 
 LABEL org.opencontainers.image.title="moleship" \
       org.opencontainers.image.description="RESTful API backend for managing Quadlet-generated systemd unit files for Podman containers" \
-      org.opencontainers.image.source="https://github.com/moleship-org/moleship"
+      org.opencontainers.image.source="https://github.com/moleship-org/moleship" \
+      org.opencontainers.image.vendor="moleship-org"
 
 # Runtime dependencies (trixie renamed a couple of these via the time_t64 transition)
 #   - systemd
@@ -102,7 +103,8 @@ COPY --from=build /src/_oputput/bin/${TARGETOS}/${TARGETARCH}/${BIN} /usr/local/
 # Only set MOLESHIP_MODE=release once you have real TLS in front of
 # moleship, paired with MOLESHIP_ALLOWED_ORIGINS set to your actual
 # frontend origin(s) -- never "*". See
-# containers/systemd/moleship.container for how to do this.
+# containers/systemd/moleship-rootless.container (or moleship-rootful.container)
+# for how to do this.
 ENV HOME=/home/moleship \
     MOLESHIP_PORT=5000 \
     MOLESHIP_SYSTEMCTL_PATH=/usr/bin/systemctl \

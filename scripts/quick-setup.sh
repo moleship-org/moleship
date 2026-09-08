@@ -3,14 +3,15 @@
 # Quadlet unit, and starts the service.
 #
 # Usage:
-#   ./scripts/quick-setup.sh [install|update|uninstall] [options...]
+#   ./scripts/quick-setup.sh [install|update|uninstall|publish] [options...]
 #
 # Defaults to "install" when no action is given.
 #
 # Common options (see scripts/setup/<action>.sh for the full list):
 #   --rootful       Manage a rootful (system-wide) deployment instead of rootless
-#   --tag <image>   Image tag to build/use (default: localhost/moleship:latest)
+#   --tag <image>   Image tag to build/use (default: ghcr.io/moleship-org/moleship:latest)
 #   --purge         (uninstall only) also remove persisted data and the image
+#   --version <v>   (publish only) also build/push a version-tagged image
 
 set -euo pipefail
 
@@ -25,11 +26,13 @@ Actions:
   install     Build the image, deploy the Quadlet unit, and start moleship (default)
   update      Rebuild the image and restart the running service
   uninstall   Stop and remove the Quadlet deployment
+  publish     Build and push the image to its registry (e.g. ghcr.io)
 
 Common options:
   --rootful       Manage a rootful (system-wide) deployment instead of rootless
-  --tag <image>   Image tag to build/use (default: localhost/moleship:latest)
+  --tag <image>   Image tag to build/use (default: ghcr.io/moleship-org/moleship:latest)
   --purge         (uninstall only) also remove persisted data and the image
+  --version <v>   (publish only) also build/push a version-tagged image
   -h, --help      Show this help
 EOF
 }
@@ -39,7 +42,7 @@ case "${1:-}" in
     usage
     exit 0
     ;;
-  install|update|uninstall)
+  install|update|uninstall|publish)
     ACTION="$1"
     shift
     ;;

@@ -9,7 +9,9 @@ CONTAINERFILE="${ROOT_DIR}/containers/Containerfile"
 UNIT_NAME="moleship.container"
 SERVICE_NAME="moleship.service"
 
-IMAGE_TAG="localhost/moleship:latest"
+default_image_tag() { printf '%s' "ghcr.io/moleship-org/moleship:latest"; }
+
+IMAGE_TAG="$(default_image_tag)"
 ROOTFUL=0
 
 log()  { printf '\033[1;34m[moleship]\033[0m %s\n' "$*"; }

@@ -24,7 +24,7 @@ Wants=podman.socket
 After=podman.socket
 
 [Container]
-Image=localhost/moleship:latest
+Image=ghcr.io/moleship-org/moleship:latest
 ContainerName=moleship
 
 # No User=/UserNS= override: this is a rootful deployment, so the

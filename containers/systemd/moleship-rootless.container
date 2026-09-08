@@ -30,7 +30,7 @@ Wants=podman.socket
 After=podman.socket
 
 [Container]
-Image=localhost/moleship:latest
+Image=ghcr.io/moleship-org/moleship:latest
 ContainerName=moleship
 
 # Run as the same UID as the owning user, mapped 1:1 into the container via

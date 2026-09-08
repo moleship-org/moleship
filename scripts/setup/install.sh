@@ -50,7 +50,7 @@ DEST_FILE="${DEST_DIR}/${UNIT_NAME}"
 log "Installing quadlet unit to ${DEST_FILE}..."
 install -m 0644 "$(quadlet_src)" "${DEST_FILE}"
 
-if [[ "${IMAGE_TAG}" != "localhost/moleship:latest" ]]; then
+if [[ "${IMAGE_TAG}" != "$(default_image_tag)" ]]; then
   sed -i "s#^Image=.*#Image=${IMAGE_TAG}#" "${DEST_FILE}"
 fi
 
