@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Rebuild the moleship image and restart the running Quadlet service to pick
-# it up.
+# Pull the latest moleship image and restart the running Quadlet service to
+# pick it up. See scripts/setup/publish.sh to build and push a new image
+# first. If the image is private, log in to its registry first (e.g.
+# `podman login ghcr.io`).
 #
 # Usage:
 #   scripts/setup/update.sh [--rootful] [--tag <image:tag>]
@@ -20,8 +22,8 @@ if [[ ! -f "${DEST_FILE}" ]]; then
   die "No existing install found at ${DEST_FILE}. Run install.sh first."
 fi
 
-log "Rebuilding ${IMAGE_TAG}..."
-podman build -f "${CONTAINERFILE}" -t "${IMAGE_TAG}" "${ROOT_DIR}"
+log "Pulling ${IMAGE_TAG}..."
+podman pull "${IMAGE_TAG}"
 
 log "Restarting moleship..."
 systemctl_ daemon-reload

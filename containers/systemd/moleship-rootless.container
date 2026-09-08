@@ -21,8 +21,7 @@
 # This unit intentionally runs moleship in its default "debug" mode (no
 # MOLESHIP_MODE override below) because it terminates plain HTTP with no
 # TLS. "release" mode marks the session/CSRF cookies Secure, which no
-# client will store/send over plain HTTP -- login would appear to succeed
-# but every subsequent authenticated request would fail.
+# client will store/send over plain HTTP.
 
 [Unit]
 Description=Moleship - Quadlet management API for Podman (rootless)
@@ -39,6 +38,12 @@ ContainerName=moleship
 User=%U:%U
 UserNS=keep-id
 
+# Required for `systemctl` to actually work against the host's systemd
+# instance: D-Bus's "local" transport authenticates the connecting peer by
+# looking up its PID in /proc, which only resolves correctly if that PID
+# means the same thing to the socket's listener.
+PodmanArgs=--pid=host
+
 # %t expands to $XDG_RUNTIME_DIR for a user manager (e.g. /run/user/1000),
 # which contains both the D-Bus session socket (bus) and the Podman socket
 # (podman/podman.sock).
@@ -50,8 +55,8 @@ Environment=MOLESHIP_HOST_USER=%u
 Environment=MOLESHIP_PODMAN_SOCKET=%t/podman/podman.sock
 
 # Default CORS allow-list: covers a browser running on this same machine
-# (localhost/127.0.0.1). Safe to leave in place regardless of
-# MOLESHIP_MODE.
+# (localhost/127.0.0.1). Safe to leave in place regardless of MOLESHIP_MODE.
+# Add here any origins that should be allowed to access the API.
 Environment=MOLESHIP_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
 
 # Persist moleship's own state (JWT secret, cache, config) and make the

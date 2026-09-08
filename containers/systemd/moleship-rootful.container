@@ -31,6 +31,17 @@ ContainerName=moleship
 # container runs as real root, matching this system-level Podman instance.
 User=root:root
 
+# Required for `systemctl` to actually work against the host's systemd
+# instance: D-Bus's "local" transport authenticates the connecting peer by
+# looking up its PID in /proc, which only resolves correctly if that PID
+# means the same thing to the socket's listener (the host's system bus) as
+# it does to the caller. Podman gives containers their own private PID
+# namespace by default, which breaks that lookup -- systemctl fails with
+# "Failed to connect to system bus via local transport: No data available"
+# for every unit. Sharing the host PID namespace fixes it. There's no
+# dedicated Quadlet key for this, so it goes through PodmanArgs=.
+PodmanArgs=--pid=host
+
 # System D-Bus
 Volume=/run/dbus:/run/dbus
 Volume=/run/podman:/run/podman

@@ -26,6 +26,7 @@ Actions:
   install     Build the image, deploy the Quadlet unit, and start moleship (default)
   update      Rebuild the image and restart the running service
   uninstall   Stop and remove the Quadlet deployment
+  build       Build the image locally
   publish     Build and push the image to its registry (e.g. ghcr.io)
 
 Common options:
@@ -42,7 +43,7 @@ case "${1:-}" in
     usage
     exit 0
     ;;
-  install|update|uninstall|publish)
+  install|update|uninstall|publish|build)
     ACTION="$1"
     shift
     ;;

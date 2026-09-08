@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Build the moleship image, deploy it as a Podman Quadlet unit, and start it.
+# Pull the moleship image, deploy it as a Podman Quadlet unit, and start it.
 #
 # Usage:
 #   scripts/setup/install.sh [--rootful] [--tag <image:tag>]
+#
+# This pulls a prebuilt image rather than building from source -- see
+# scripts/setup/publish.sh to build and push one. If the image is private,
+# log in to its registry first (e.g. `podman login ghcr.io`).
 #
 # Rootless (default): installs to ~/.config/containers/systemd and manages
 # the service under `systemctl --user`. Requires no special privileges,
@@ -22,8 +26,8 @@ require_rootful_privileges
 require_cmd podman
 require_cmd systemctl
 
-log "Building ${IMAGE_TAG}..."
-podman build -f "${CONTAINERFILE}" -t "${IMAGE_TAG}" "${ROOT_DIR}"
+log "Pulling ${IMAGE_TAG}..."
+podman pull "${IMAGE_TAG}"
 
 if [[ "${ROOTFUL}" -eq 0 ]]; then
   log "Enabling the rootless Podman socket..."
