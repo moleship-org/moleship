@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	passwordHashFilename = "password_hash"
+	credentialsFilename  = "credentials.json"
 	passwordInitFilename = "password_init"
 
 	hashFilePerm = 0o600
@@ -88,7 +88,7 @@ func NewAuthService(params *NewAuthServiceParams) (*AuthService, error) {
 }
 
 func (s *AuthService) hashPath() string {
-	return filepath.Join(s.dir, passwordHashFilename)
+	return filepath.Join(s.dir, credentialsFilename)
 }
 
 func (s *AuthService) initPath() string {
