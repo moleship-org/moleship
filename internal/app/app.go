@@ -138,20 +138,12 @@ func (a *Application) MountRoutes() error {
 	systemdHandler := handler.NewSystemd(a.Logger(), a.systemdAdapter)
 	quadletHandler := handler.NewQuadlet(a.Logger(), a.quadletSvc)
 
-	publicLimiter := tollbooth.NewLimiter(config.PUBLIC_RATE_LIMIT, &limiter.ExpirableOptions{
-		DefaultExpirationTTL: 1 * time.Hour,
-	})
-
-	publicLimiter.SetBurst(config.PUBLIC_BURST_LIMIT)
-	publicLimiter.SetIPLookup(limiter.IPLookup{
-		Name:           config.PUBLIC_IP_HEADER_LOOKUP,
-		IndexFromRight: 0,
-	})
+	pubLimiter := makePublicLimiter()
 
 	a.router.Route("/api", func(r chi.Router) {
 		r.Route("/v1", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
-				r.Use(tollbooth.HTTPMiddleware(publicLimiter))
+				r.Use(tollbooth.HTTPMiddleware(pubLimiter))
 
 				healthHandler.Mount(r)
 				authHandler.Mount(r)
@@ -216,4 +208,17 @@ func sanitizeAllowedOrigins(origins []string) []string {
 		result = append(result, origin)
 	}
 	return result
+}
+
+func makePublicLimiter() *limiter.Limiter {
+	pl := tollbooth.NewLimiter(config.PUBLIC_RATE_LIMIT, &limiter.ExpirableOptions{
+		DefaultExpirationTTL: 1 * time.Hour,
+	})
+	pl.SetBurst(config.PUBLIC_BURST_LIMIT)
+	pl.SetIPLookup(limiter.IPLookup{
+		Name:           config.PUBLIC_IP_HEADER_LOOKUP,
+		IndexFromRight: 0,
+	})
+
+	return pl
 }
