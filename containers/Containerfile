@@ -29,7 +29,7 @@ RUN go mod download
 
 COPY . .
 
-# Delegates to scripts/build.sh via the project Makefile
+# Building
 RUN make build \
         BIN="${BIN}" \
         VERSION="${VERSION}" \
@@ -47,23 +47,7 @@ LABEL org.opencontainers.image.title="moleship" \
       org.opencontainers.image.source="https://github.com/moleship-org/moleship" \
       org.opencontainers.image.vendor="moleship-org"
 
-# Runtime dependencies
-#   - systemd
-#   - libgpgme11t64, libassuan9
-#   - gnupg
-#   - ca-certificates
-#
-# The mkdir/chmod at the end matters: at runtime the container is
-# overridden to run as an arbitrary host UID (Quadlet's User=%U +
-# UserNS=keep-id), which has nothing to do with this build-time "moleship"
-# system user. useradd's default home dir mode (0700, owner-only) would
-# make /home/moleship completely inaccessible to that runtime UID -- not
-# just for writing, but for traversal, breaking every bind-mounted state
-# directory underneath it even though those are correctly owned by the
-# host user. Pre-create the intermediate scaffolding directories and make
-# the whole tree world-traversable; the actual state-bearing leaf
-# directories get replaced by correctly-owned bind mounts at runtime
-# anyway.
+# Runtime dependencies and preconfiguration of directories
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         systemd \

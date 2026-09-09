@@ -1,17 +1,5 @@
 #!/usr/bin/env bash
-# One-command setup for moleship: builds the image, deploys it as a Podman
-# Quadlet unit, and starts the service.
-#
-# Usage:
-#   ./scripts/quick-setup.sh [install|update|uninstall|publish] [options...]
-#
-# Defaults to "install" when no action is given.
-#
-# Common options (see scripts/setup/<action>.sh for the full list):
-#   --rootful       Manage a rootful (system-wide) deployment instead of rootless
-#   --tag <image>   Image tag to build/use (default: ghcr.io/moleship-org/moleship:latest)
-#   --purge         (uninstall only) also remove persisted data and the image
-#   --version <v>   (publish only) also build/push a version-tagged image
+# Command handler for moleship
 
 set -euo pipefail
 
@@ -20,7 +8,7 @@ SETUP_DIR="${SCRIPT_DIR}/setup"
 
 usage() {
   cat <<'EOF'
-Usage: quick-setup.sh [action] [options...]
+Usage: moleship.sh [action] [options...]
 
 Actions:
   install     Build the image, deploy the Quadlet unit, and start moleship (default)
@@ -48,8 +36,7 @@ case "${1:-}" in
     shift
     ;;
   ""|--*)
-    # No action given, or the first token is an option (e.g. --tag): default
-    # to install and leave it in place for install.sh to parse.
+    # No action given, default to install.
     ACTION="install"
     ;;
   *)

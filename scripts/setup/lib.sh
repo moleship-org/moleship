@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for the moleship setup scripts (install.sh, update.sh,
-# uninstall.sh). Not meant to be run directly.
+# Shared helpers for the moleship setup scripts. Not meant to be run directly.
 
 SETUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SETUP_DIR}/../.." && pwd)"
@@ -14,17 +13,37 @@ default_image_tag() { printf '%s' "ghcr.io/moleship-org/moleship:latest"; }
 IMAGE_TAG="$(default_image_tag)"
 ROOTFUL=0
 
-log()  { printf '\033[1;34m[moleship]\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33m[moleship]\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[1;31m[moleship]\033[0m %s\n' "$*" >&2; exit 1; }
+# --- output helpers ----------------------------------------------------------
+
+if [ -t 1 ]; then
+  C_RESET=$'\033[0m'
+  C_RED=$'\033[31m'
+  C_GREEN=$'\033[32m'
+  C_YELLOW=$'\033[33m'
+  C_BLUE=$'\033[34m'
+else
+  C_RESET=""
+  C_RED=""
+  C_GREEN=""
+  C_YELLOW=""
+  C_BLUE=""
+fi
+
+log_info()    { printf '%s[info]%s %s\n'  "$C_BLUE"   "$C_RESET" "$*"; }
+log_success() { printf '%s[ ok ]%s %s\n'  "$C_GREEN"  "$C_RESET" "$*"; }
+log_warn()    { printf '%s[warn]%s %s\n'  "$C_YELLOW" "$C_RESET" "$*" >&2; }
+log_error()   { printf '%s[fail]%s %s\n'  "$C_RED"    "$C_RESET" "$*" >&2; }
+
+# Generic-purpose logger
+log() { printf '%s\n' "$@"; }
+
+# --- command helpers ---------------------------------------------------------
 
 require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "'$1' is required but was not found in PATH."
+  command -v "$1" >/dev/null 2>&1 || log_error "'$1' is required but was not found in PATH."
 }
 
-# Scans (without consuming) the action's arguments for flags shared across
-# install/update/uninstall, so each script can still do its own parsing pass
-# for action-specific flags afterwards.
+# Scans (without consuming) the action's argument flags
 parse_common_flags() {
   local args=("$@")
   local i=0
@@ -44,12 +63,11 @@ parse_common_flags() {
 
 require_rootful_privileges() {
   if [[ "${ROOTFUL}" -eq 1 && "${EUID}" -ne 0 ]]; then
-    die "--rootful requires running as root, e.g.: sudo $0 --rootful"
+    log_error "--rootful requires running as root, e.g.: sudo $0 --rootful"
   fi
 }
 
 # Wraps systemctl so every caller automatically targets the right manager
-# (user session vs. system-wide) based on the --rootful flag.
 systemctl_() {
   if [[ "${ROOTFUL}" -eq 1 ]]; then
     systemctl "$@"
@@ -66,9 +84,6 @@ quadlet_dir() {
   fi
 }
 
-# Picks the right template based on --rootful. Both get installed under the
-# same UNIT_NAME (moleship.container) in their respective quadlet_dir, so
-# the resulting service is always named moleship.service either way.
 quadlet_src() {
   if [[ "${ROOTFUL}" -eq 1 ]]; then
     printf '%s' "${ROOT_DIR}/containers/systemd/moleship-rootful.container"
@@ -77,14 +92,8 @@ quadlet_src() {
   fi
 }
 
-# The following three mirror moleship's own defaults
-# (internal/config/config.go) and must match the Volume= host paths in
-# containers/systemd/moleship-rootless.container (%h/.config/moleship etc.)
-# and moleship-rootful.container (/etc/moleship etc.). They're bind-mount
-# sources for the running container, so they need to exist upfront with
-# the right ownership -- otherwise Podman may auto-create them with
-# ownership that doesn't line up with the UID the container runs as, and
-# moleship will fail to write its JWT secret / config on first start.
+# --- path helpers -------------------------------------------------------------
+
 config_home_dir() {
   if [[ "${ROOTFUL}" -eq 1 ]]; then
     printf '%s' "/etc/moleship"
@@ -109,8 +118,6 @@ data_home_dir() {
   fi
 }
 
-# Creates all of the host directories moleship's container bind-mounts into
-# itself, with the right ownership, before the service ever starts.
 prepare_state_dirs() {
   local dir
   for dir in "$(config_home_dir)" "$(cache_home_dir)" "$(data_home_dir)" "$(quadlet_dir)"; do
@@ -126,12 +133,24 @@ journal_hint() {
   fi
 }
 
-# Text form of the systemctl_ wrapper above, for use in log messages that
-# tell the user what command to run themselves.
 systemctl_cmd() {
   if [[ "${ROOTFUL}" -eq 1 ]]; then
     printf 'systemctl'
   else
     printf 'systemctl --user'
   fi
+}
+
+unit_exists() {
+  local unit="${1}.service"
+  if [[ "${ROOTFUL}" -eq 1 ]]; then
+    systemctl list-unit-files --no-legend | awk '{print $1}' | grep -qxF "${unit}"
+  else
+    systemctl --user list-unit-files --no-legend | awk '{print $1}' | grep -qxF "${unit}"
+  fi
+}
+
+quadlet_installed() {
+  local file="${1:-${UNIT_NAME}}"
+  [[ -e "$(quadlet_dir)/${file}" ]]
 }

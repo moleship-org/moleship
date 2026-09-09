@@ -1,44 +1,14 @@
 #!/usr/bin/env bash
-# Build and push the moleship image to its container registry.
-#
-# Usage:
-#   scripts/setup/publish.sh [--tag <image:tag>] [--version <version>]
-#
-#   --tag       Primary image reference to build and push.
-#               Default: ghcr.io/moleship-org/moleship:latest
-#   --version   Also build/push an additional tag for this version
-#               (e.g. v1.2.3), and pass it as the VERSION build-arg baked
-#               into the binary (see scripts/build.sh).
-#
-# You must be logged in to the target registry first, e.g.:
-#
-#   podman login ghcr.io -u <your-github-username>
-#
-# using a GitHub Personal Access Token with the `write:packages` scope
-# (classic) or `packages: write` permission (fine-grained) as the password.
+# Build the moleship image using podman.
 
 set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
-TAG="$(default_image_tag)"
+IMAGE_TAG="$(default_image_tag)"
 VERSION=""
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --tag)
-      TAG="$2"
-      shift 2
-      ;;
-    --version)
-      VERSION="$2"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
+parse_common_flags "$@"
 
 require_cmd podman
 
@@ -47,5 +17,7 @@ if [[ -n "${VERSION}" ]]; then
   BUILD_ARGS+=(--build-arg "VERSION=${VERSION}")
 fi
 
-log "Building ${TAG}..."
-podman build -f "${CONTAINERFILE}" -t "${TAG}" "${BUILD_ARGS[@]}" "${ROOT_DIR}"
+log_info "Building ${IMAGE_TAG}..."
+podman build -f "${CONTAINERFILE}" -t "${IMAGE_TAG}" "${BUILD_ARGS[@]}" "${ROOT_DIR}"
+
+log_success "Successfully built ${IMAGE_TAG}"

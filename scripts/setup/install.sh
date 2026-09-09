@@ -1,20 +1,5 @@
 #!/usr/bin/env bash
 # Pull the moleship image, deploy it as a Podman Quadlet unit, and start it.
-#
-# Usage:
-#   scripts/setup/install.sh [--rootful] [--tag <image:tag>]
-#
-# This pulls a prebuilt image rather than building from source -- see
-# scripts/setup/publish.sh to build and push one. If the image is private,
-# log in to its registry first (e.g. `podman login ghcr.io`).
-#
-# Rootless (default): installs to ~/.config/containers/systemd and manages
-# the service under `systemctl --user`. Requires no special privileges,
-# except for a one-time `loginctl enable-linger`, which the script requests
-# via sudo.
-#
-# Rootful (--rootful): installs to /etc/containers/systemd and manages the
-# service under the system `systemctl`. Must be run as root (e.g. via sudo).
 
 set -euo pipefail
 
@@ -23,10 +8,19 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 parse_common_flags "$@"
 require_rootful_privileges
 
+if quadlet_installed "${UNIT_NAME}"; then
+  log_warn "Unit ${UNIT_NAME} already exists; refusing to overwrite."
+  read -p "Do you want to overwrite? [y/N] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
+
 require_cmd podman
 require_cmd systemctl
 
-log "Pulling ${IMAGE_TAG}..."
+log_info "Pulling ${IMAGE_TAG}..."
 podman pull "${IMAGE_TAG}"
 
 if [[ "${ROOTFUL}" -eq 0 ]]; then
@@ -36,9 +30,9 @@ if [[ "${ROOTFUL}" -eq 0 ]]; then
   log "Enabling linger for $(whoami) (keeps your session alive across logout)..."
   if command -v loginctl >/dev/null 2>&1; then
     sudo loginctl enable-linger "$(whoami)" \
-      || warn "Could not enable linger automatically; run manually: sudo loginctl enable-linger $(whoami)"
+      || log_warn "Could not enable linger automatically; run manually: sudo loginctl enable-linger $(whoami)"
   else
-    warn "'loginctl' not found; skipping linger setup."
+    log_warn "'loginctl' not found; skipping linger setup."
   fi
 else
   log "Enabling the rootful Podman socket..."
@@ -58,7 +52,7 @@ if [[ "${IMAGE_TAG}" != "$(default_image_tag)" ]]; then
   sed -i "s#^Image=.*#Image=${IMAGE_TAG}#" "${DEST_FILE}"
 fi
 
-log "Starting moleship..."
+log_info "Starting moleship..."
 systemctl_ daemon-reload
 systemctl_ start "${SERVICE_NAME}"
 
@@ -67,7 +61,7 @@ if command -v curl >/dev/null 2>&1; then
   log "Waiting for moleship to become healthy..."
   for _ in $(seq 1 30); do
     if curl -fs "http://localhost:${PORT}/api/v1/health/" >/dev/null 2>&1; then
-      log "moleship is up: http://localhost:${PORT}"
+      log_success "moleship is up: http://localhost:${PORT}"
       log ""
       log "Log in once to set your password (username must be '$(whoami)'):"
       log "  curl -X POST http://localhost:${PORT}/api/v1/auth/login \\"
@@ -77,8 +71,8 @@ if command -v curl >/dev/null 2>&1; then
     fi
     sleep 1
   done
-  warn "moleship did not report healthy within 30s. Check logs with:"
-  warn "  $(journal_hint)"
+  log_warn "moleship did not report healthy within 30s. Check logs with:"
+  log_warn "  $(journal_hint)"
   exit 1
 fi
 
