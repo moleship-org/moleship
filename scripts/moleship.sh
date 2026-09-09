@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SETUP_DIR="${SCRIPT_DIR}/setup"
+MOLESHIP_DIR="${SCRIPT_DIR}/moleship"
 
 usage() {
   cat <<'EOF'
@@ -46,4 +46,4 @@ case "${1:-}" in
     ;;
 esac
 
-exec "${SETUP_DIR}/${ACTION}.sh" "$@"
+exec "${MOLESHIP_DIR}/${ACTION}.sh" "$@"
