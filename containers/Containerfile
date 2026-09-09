@@ -47,7 +47,7 @@ LABEL org.opencontainers.image.title="moleship" \
       org.opencontainers.image.source="https://github.com/moleship-org/moleship" \
       org.opencontainers.image.vendor="moleship-org"
 
-# Runtime dependencies (trixie renamed a couple of these via the time_t64 transition)
+# Runtime dependencies
 #   - systemd
 #   - libgpgme11t64, libassuan9
 #   - gnupg
@@ -81,30 +81,6 @@ RUN apt-get update \
 
 COPY --from=build /src/_oputput/bin/${TARGETOS}/${TARGETARCH}/${BIN} /usr/local/bin/moleship
 
-# Deliberately NOT setting MOLESHIP_MODE or MOLESHIP_ALLOWED_ORIGINS here.
-# They're coupled in a way that makes a "safe-looking" baked-in default
-# actively harmful (see internal/config/config.go and internal/app/app.go):
-#
-#   - MOLESHIP_MODE defaults to "debug" upstream. "release" mode marks the
-#     session/CSRF cookies Secure (internal/services/auth/cookies), which
-#     browsers and curl alike refuse to store/send over plain HTTP. This
-#     image ships no TLS termination, so baking in MOLESHIP_MODE=release
-#     here would silently break login for every client.
-#
-#   - app.go's MountRoutes refuses to start at all in release mode unless
-#     MOLESHIP_ALLOWED_ORIGINS is non-empty. Setting it to "*" to satisfy
-#     that check doesn't actually help: go-chi/cors treats "*" (and, just
-#     as importantly, an *unset* AllowedOrigins list) as allow-all, and
-#     emits both `Access-Control-Allow-Origin: *` and
-#     `Access-Control-Allow-Credentials: true` on the same response with
-#     no guard against that combination -- which browsers then refuse to
-#     honor for any credentialed (cookie-carried) request anyway.
-#
-# Only set MOLESHIP_MODE=release once you have real TLS in front of
-# moleship, paired with MOLESHIP_ALLOWED_ORIGINS set to your actual
-# frontend origin(s) -- never "*". See
-# containers/systemd/moleship-rootless.container (or moleship-rootful.container)
-# for how to do this.
 ENV HOME=/home/moleship \
     MOLESHIP_PORT=5000 \
     MOLESHIP_SYSTEMCTL_PATH=/usr/bin/systemctl \

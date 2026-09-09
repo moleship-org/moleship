@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -71,7 +72,7 @@ var (
 	DATA_HOME string = ""
 
 	// Default path to the Podman unix socket for communication with the Podman service (libpod)
-	PODMAN_SOCKET string = "/var/run/podman.sock"
+	PODMAN_SOCKET string = "/run/podman/podman.sock"
 
 	// Default path to the Podman executable
 	PODMAN_PATH string = "/usr/bin/podman"
@@ -118,6 +119,9 @@ func IsReleaseMode() bool {
 
 func getEnvOrDefault(key string, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists {
+		if value == "" {
+			return defaultValue
+		}
 		return value
 	}
 	return defaultValue
@@ -129,13 +133,17 @@ func init() {
 		ROOTFUL = rootful
 	}
 
-	HOST_USER = getEnvOrDefault(EnvHostUser, "unknown")
-	HOST_UID = getEnvOrDefault(EnvHostUID, "")
-
 	if ROOTFUL {
 		handleRootfulConfig()
 	} else {
 		handleRootlessConfig()
+	}
+
+	dirs := []string{CONFIG_HOME, CACHE_HOME, DATA_HOME, QUADLET_HOME}
+	for _, dir := range dirs {
+		if err := makeDirIfNotExists(dir); err != nil {
+			panic("Failed to create directory: " + dir + " - " + err.Error())
+		}
 	}
 
 	p, err := strconv.ParseUint(getEnvOrDefault(EnvPort, "5000"), 10, 16)
@@ -145,7 +153,6 @@ func init() {
 
 	LOG_LEVEL = getEnvOrDefault(EnvLogLevel, "info")
 	MODE = getEnvOrDefault(EnvMode, "debug")
-	PODMAN_SOCKET = getEnvOrDefault(EnvPodmanSocket, "/run/user/1000/podman/podman.sock")
 	PODMAN_PATH = getEnvOrDefault(EnvPodmanPath, "/usr/bin/podman")
 	if enabled, err := strconv.ParseBool(getEnvOrDefault(EnvEnableLibpodProxy, "false")); err == nil {
 		ENABLE_LIBPOD_PROXY = enabled
@@ -186,13 +193,6 @@ func init() {
 	}
 
 	PUBLIC_IP_HEADER_LOOKUP = getEnvOrDefault(EnvPublicIPHeaderLookup, PUBLIC_IP_HEADER_LOOKUP)
-
-	dirs := []string{CONFIG_HOME, CACHE_HOME, DATA_HOME, QUADLET_HOME}
-	for _, dir := range dirs {
-		if err := makeDirIfNotExists(dir); err != nil {
-			panic("Failed to create directory: " + dir + " - " + err.Error())
-		}
-	}
 }
 
 func handleRootfulConfig() {
@@ -200,6 +200,20 @@ func handleRootfulConfig() {
 	CACHE_HOME = getEnvOrDefault(EnvCacheHome, DefaultRootfulCacheHome)
 	DATA_HOME = getEnvOrDefault(EnvDataHome, DefaultRootfulDataHome)
 	QUADLET_HOME = getEnvOrDefault(EnvQuadletHome, DefaultRootfulQuadletHome)
+
+	if !strings.HasSuffix(CONFIG_HOME, "moleship") {
+		CONFIG_HOME = filepath.Join(CONFIG_HOME, "moleship")
+	}
+	if !strings.HasSuffix(CACHE_HOME, "moleship") {
+		CACHE_HOME = filepath.Join(CACHE_HOME, "moleship")
+	}
+	if !strings.HasSuffix(DATA_HOME, "moleship") {
+		DATA_HOME = filepath.Join(DATA_HOME, "moleship")
+	}
+
+	HOST_USER = "root"
+	HOST_UID = "0"
+	PODMAN_SOCKET = "/run/podman/podman.sock"
 }
 
 func handleRootlessConfig() {
@@ -209,18 +223,36 @@ func handleRootlessConfig() {
 	}
 
 	CONFIG_HOME = getEnvOrDefault(EnvConfigHome, filepath.Join(homeDir, ".config", "moleship"))
-	CACHE_HOME = getEnvOrDefault(EnvCacheHome, filepath.Join(homeDir, ".cache", "moleship"))
-	DATA_HOME = getEnvOrDefault(EnvDataHome, filepath.Join(homeDir, ".local", "share", "moleship"))
-	QUADLET_HOME = getEnvOrDefault(EnvQuadletHome, filepath.Join(homeDir, ".config", "containers", "systemd"))
-}
-
-func makeDirIfNotExists(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.MkdirAll(path, 0755); err != nil {
-			return err
-		}
+	if !strings.HasSuffix(CONFIG_HOME, "moleship") {
+		CONFIG_HOME = filepath.Join(CONFIG_HOME, "moleship")
 	}
-	return nil
+
+	CACHE_HOME = getEnvOrDefault(EnvCacheHome, filepath.Join(homeDir, ".cache", "moleship"))
+	if !strings.HasSuffix(CACHE_HOME, "moleship") {
+		CACHE_HOME = filepath.Join(CACHE_HOME, "moleship")
+	}
+
+	DATA_HOME = getEnvOrDefault(EnvDataHome, filepath.Join(homeDir, ".local", "share", "moleship"))
+	if !strings.HasSuffix(DATA_HOME, "moleship") {
+		DATA_HOME = filepath.Join(DATA_HOME, "moleship")
+	}
+
+	QUADLET_HOME = getEnvOrDefault(EnvQuadletHome, filepath.Join(homeDir, ".config", "containers", "systemd"))
+
+	u, _ := user.Current()
+	if u != nil {
+		HOST_USER = getEnvOrDefault(EnvHostUser, u.Username)
+		if ROOTFUL {
+			HOST_UID = "root"
+		}
+
+		HOST_UID = getEnvOrDefault(EnvHostUID, u.Uid)
+		PODMAN_SOCKET = getEnvOrDefault(EnvPodmanSocket, "/run/user/"+HOST_UID+"/podman/podman.sock")
+	} else {
+		HOST_USER = getEnvOrDefault(EnvHostUser, "guest")
+		HOST_UID = getEnvOrDefault(EnvHostUID, "1000")
+		PODMAN_SOCKET = getEnvOrDefault(EnvPodmanSocket, "/run/user/1000/podman/podman.sock")
+	}
 }
 
 func getOrCreateJWTSecret(dataHome string) ([]byte, error) {
@@ -232,10 +264,6 @@ func getOrCreateJWTSecret(dataHome string) ([]byte, error) {
 			return nil, fmt.Errorf("failed to decode jwt_secret.key: %w", decodeErr)
 		}
 		return secret, nil
-	}
-
-	if err := os.MkdirAll(dataHome, 0700); err != nil {
-		return nil, err
 	}
 
 	secret := make([]byte, 32)
@@ -250,4 +278,13 @@ func getOrCreateJWTSecret(dataHome string) ([]byte, error) {
 	}
 
 	return secret, nil
+}
+
+func makeDirIfNotExists(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return err
+		}
+	}
+	return nil
 }

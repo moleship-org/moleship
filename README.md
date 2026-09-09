@@ -1,6 +1,6 @@
 # Moleship
 
-Moleship is a tool for managing Quadlet unit files with a RESTful API.
+Moleship RESTful API backend service for managing Quadlet unit files.
 
 ## Requirements
 
@@ -9,12 +9,24 @@ Core dependencies:
 * systemd 257+
 * podman v5+
 * go v1.27+
-* gpgme 1.24+
+
+Build dependencies:
+
+* gpgme
+* btrfs
+* devmapper
+* seccomp
 
 ### Debian/Ubuntu Install
 
 ```sh
-apt install -y podman podman-compose libgpgme-de
+apt install -y \
+    podman \
+    podman-compose \
+    libgpgme-dev \
+    libbtrfs-dev \
+    libdevmapper-dev \
+    libseccomp-dev
 ```
 
 ## Building

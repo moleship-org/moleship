@@ -1,30 +1,7 @@
-# Quadlet unit for moleship itself.
-#
-# Install this file under ~/.config/containers/systemd/ (rootless) and enable
-# lingering for the user so the session survives logout:
-#
-#   loginctl enable-linger "$(whoami)"
-#   systemctl --user daemon-reload
-#   systemctl --user start moleship.service
-#
-# Requires the user's Podman socket to be active:
-#
-#   systemctl --user enable --now podman.socket
-#
-# This unit assumes rootless mode (MOLESHIP_ROOTFUL=false, the default). For
-# rootful deployments, install under /etc/containers/systemd/ instead, drop
-# User=/UserNS=/XDG_RUNTIME_DIR/DBUS_SESSION_BUS_ADDRESS, mount /run/dbus and
-# /var/run/podman.sock instead of %t, and use the rootful default paths
-# (/etc/moleship, /var/lib/moleship, /var/cache/moleship,
-# /etc/containers/systemd).
-#
-# This unit intentionally runs moleship in its default "debug" mode (no
-# MOLESHIP_MODE override below) because it terminates plain HTTP with no
-# TLS. "release" mode marks the session/CSRF cookies Secure, which no
-# client will store/send over plain HTTP.
+# Quadlet unit for moleship -- rootless variant (default)
 
 [Unit]
-Description=Moleship - Quadlet management API for Podman (rootless)
+Description=Moleship - Quadlet management API for Podman and Systemd (rootless)
 Wants=podman.socket
 After=podman.socket
 
@@ -32,16 +9,10 @@ After=podman.socket
 Image=ghcr.io/moleship-org/moleship:latest
 ContainerName=moleship
 
-# Run as the same UID as the owning user, mapped 1:1 into the container via
-# keep-id, so moleship can access this user's systemd session bus and
-# Podman socket.
 User=%U:%U
 UserNS=keep-id
 
-# Required for `systemctl` to actually work against the host's systemd
-# instance: D-Bus's "local" transport authenticates the connecting peer by
-# looking up its PID in /proc, which only resolves correctly if that PID
-# means the same thing to the socket's listener.
+# Required for `systemctl` to actually work against the host's systemd instance.
 PodmanArgs=--pid=host
 
 # %t expands to $XDG_RUNTIME_DIR for a user manager (e.g. /run/user/1000),
@@ -54,13 +25,12 @@ Environment=MOLESHIP_HOST_UID=%U
 Environment=MOLESHIP_HOST_USER=%u
 Environment=MOLESHIP_PODMAN_SOCKET=%t/podman/podman.sock
 
-# Default CORS allow-list: covers a browser running on this same machine
-# (localhost/127.0.0.1). Safe to leave in place regardless of MOLESHIP_MODE.
+# Default CORS allow-list.
 # Add here any origins that should be allowed to access the API.
-Environment=MOLESHIP_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+# It has the default target port of 3000 for the colossus frontend.
+Environment=MOLESHIP_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000
 
-# Persist moleship's own state (JWT secret, cache, config) and make the
-# quadlet files it writes visible to this user's systemd instance.
+# Persist moleship's own state.
 Volume=%h/.config/moleship:/home/moleship/.config/moleship
 Volume=%h/.cache/moleship:/home/moleship/.cache/moleship
 Volume=%h/.local/share/moleship:/home/moleship/.local/share/moleship

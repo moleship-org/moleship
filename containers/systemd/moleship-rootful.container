@@ -1,25 +1,7 @@
-# Quadlet unit for moleship itself -- rootful variant.
-#
-# Install this file under /etc/containers/systemd/ and enable the system
-# Podman socket plus this service (all as root, no lingering needed since
-# this is a system-level manager, not tied to any login session):
-#
-#   systemctl enable --now podman.socket
-#   systemctl daemon-reload
-#   systemctl start moleship.service
-#
-# For a rootless deployment instead, see moleship-rootless.container --
-# install under ~/.config/containers/systemd/ and manage it via
-# `systemctl --user`.
-#
-# This unit intentionally runs moleship in its default "debug" mode (no
-# MOLESHIP_MODE override below) because it terminates plain HTTP with no
-# TLS. "release" mode marks the session/CSRF cookies Secure, which no
-# client will store/send over plain HTTP -- login would appear to succeed
-# but every subsequent authenticated request would fail.
+# Quadlet unit for moleship -- rootful variant.
 
 [Unit]
-Description=Moleship - Quadlet management API for Podman (rootful)
+Description=Moleship - Quadlet management API for Podman and Systemd (rootful)
 Wants=podman.socket
 After=podman.socket
 
@@ -27,19 +9,9 @@ After=podman.socket
 Image=ghcr.io/moleship-org/moleship:latest
 ContainerName=moleship
 
-# No User=/UserNS= override: this is a rootful deployment, so the
-# container runs as real root, matching this system-level Podman instance.
 User=root:root
 
-# Required for `systemctl` to actually work against the host's systemd
-# instance: D-Bus's "local" transport authenticates the connecting peer by
-# looking up its PID in /proc, which only resolves correctly if that PID
-# means the same thing to the socket's listener (the host's system bus) as
-# it does to the caller. Podman gives containers their own private PID
-# namespace by default, which breaks that lookup -- systemctl fails with
-# "Failed to connect to system bus via local transport: No data available"
-# for every unit. Sharing the host PID namespace fixes it. There's no
-# dedicated Quadlet key for this, so it goes through PodmanArgs=.
+# Required for `systemctl` to actually work against the host's systemd instance.
 PodmanArgs=--pid=host
 
 # System D-Bus
@@ -51,16 +23,14 @@ Environment=MOLESHIP_PODMAN_SOCKET=/run/podman/podman.sock
 # There's no single "current user" for a rootful, system-level deployment,
 # so MOLESHIP_HOST_USER can't be auto-derived the way the rootless unit
 # derives it from %u
-Environment=MOLESHIP_HOST_USER=admin
+Environment=MOLESHIP_HOST_USER=root
 
-# Default CORS allow-list: covers a browser running on this same machine
-# (localhost/127.0.0.1). Safe to leave in place regardless of
-# MOLESHIP_MODE.
-Environment=MOLESHIP_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+# Default CORS allow-list.
+# Add here any origins that should be allowed to access the API.
+# It has the default target port of 3000 for the colossus frontend.
+Environment=MOLESHIP_ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000
 
-# Persist moleship's own state (JWT secret, cache, config) using the
-# rootful default paths, and make the quadlet files it writes visible to
-# the system-wide systemd instance.
+# Persist moleship's own state.
 Volume=/etc/moleship:/etc/moleship
 Volume=/var/cache/moleship:/var/cache/moleship
 Volume=/var/lib/moleship:/var/lib/moleship
