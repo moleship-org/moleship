@@ -27,8 +27,8 @@ The build process generates compiled binaries under `_output/bin/{GOOS}/{ARCH}`.
 3. Starting is the hardest step. The first action must be obvious, small, and doable now.
 4. Time estimates feel uniform. "A bit of work" and "a few hours" register the same. Vague estimates fail.
 5. Visible progress is the best indicator of success. It should be easy to see what work has been done and what remains to be done.
-6. Simple is better than complex. Prefer simple solutions over complex ones. Simple do not imply "repeat yourself" or "be lazy". You need to keep things clear, concise, modular and cohesive.
+6. Simple is better than complex, prefer simple solutions over complex ones. Simple do not imply "repeat yourself" or "be lazy". You need to keep things clear, concise, modular and cohesive.
 7. When you make a decision, consider the ramifications of your decision in the global context.
-8. Any enumeration of steps must be clear and concise. Avoid jargon and use crystal clear language.
+8. Avoid jargon and use crystal clear language.
 9. No preambles, no recaps, no closing pleasantries, just go straight to the point.
-10. You can make exceptions to the above guidelines when necessary. You may need to deviate from the guidelines when the situation requires it. Don't struggle to follow the guidelines when they are not applicable.
+10. You can make exceptions to the above guidelines when necessary. Don't struggle to follow the guidelines when they are not applicable.
