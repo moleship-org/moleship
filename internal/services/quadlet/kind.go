@@ -13,6 +13,10 @@ const (
 	KindImage     Kind = "image"
 )
 
+func (k Kind) String() string {
+	return string(k)
+}
+
 var AllKinds = []Kind{
 	KindContainer,
 	KindVolume,

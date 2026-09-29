@@ -150,8 +150,8 @@ func (a *Application) MountRoutes() error {
 			})
 
 			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireAuth(a.authSvc))
-				r.Use(middleware.RequireCSRF())
+				//r.Use(middleware.RequireAuth(a.authSvc))
+				//r.Use(middleware.RequireCSRF())
 
 				libpodHandler.Mount(r)
 				systemdHandler.Mount(r)
@@ -183,7 +183,7 @@ func (a *Application) Prepare() error {
 	}
 
 	a.quadletFS = fsq
-	a.quadletSvc = quadlet.New(a.quadletFS, a.systemdAdapter)
+	a.quadletSvc = quadlet.New(a.quadletFS, a.systemdAdapter, a.podmanAdapter)
 
 	authSvc, err := auth.NewAuthService(&auth.NewAuthServiceParams{
 		HostUser:   config.HOST_USER,

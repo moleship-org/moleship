@@ -2,7 +2,7 @@ package podman
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"net"
@@ -91,7 +91,7 @@ func decodePodmanError(res *http.Response) error {
 		Message string `json:"message"`
 	}
 
-	if decodeErr := json.NewDecoder(res.Body).Decode(&podmanErr); decodeErr == nil {
+	if decodeErr := json.UnmarshalRead(res.Body, &podmanErr); decodeErr == nil {
 		return fmt.Errorf("podman api error (%d): %s - %s",
 			res.StatusCode, podmanErr.Cause, podmanErr.Message)
 	}
@@ -125,7 +125,7 @@ func (p *Podman) GetVersion(ctx context.Context) (*entities.ComponentVersion, er
 	}
 
 	var cv entities.ComponentVersion
-	if err := json.NewDecoder(res.Body).Decode(&cv); err != nil {
+	if err := json.UnmarshalRead(res.Body, &cv); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidResponse, err)
 	}
 
@@ -148,7 +148,7 @@ func (p *Podman) ListContainers(ctx context.Context, opts url.Values) ([]entitie
 	}
 
 	var containers []entities.ListContainer
-	if err := json.NewDecoder(res.Body).Decode(&containers); err != nil {
+	if err := json.UnmarshalRead(res.Body, &containers); err != nil {
 		return nil, ErrInvalidResponse
 	}
 
@@ -190,7 +190,7 @@ func (p *Podman) Stats(ctx context.Context, name string) (*entities.ContainerSta
 	}
 
 	var report entities.ContainerStatReport
-	if err := json.NewDecoder(res.Body).Decode(&report); err != nil {
+	if err := json.UnmarshalRead(res.Body, &report); err != nil {
 		return nil, ErrInvalidResponse
 	}
 

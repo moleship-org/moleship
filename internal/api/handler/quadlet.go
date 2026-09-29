@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json/v2"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -30,87 +31,65 @@ func (h *Quadlet) Mount(r chi.Router) {
 		r.Route("/quadlet", func(r chi.Router) {
 			r.Get("/", h.List)
 
-			r.Route("/containers", func(r chi.Router) {
-				r.Get("/", h.ListContainers)
-				r.Post("/", h.CreateContainer)
+			services := []string{"containers", "volumes", "networks", "images"}
+			for _, service := range services {
+				r.Route("/"+service, func(r chi.Router) {
+					kind := quadlet.KindContainer
+					switch service {
+					case "containers":
+						r.Get("/", h.ListContainers)
+						r.Post("/", h.CreateContainer)
+					case "volumes":
+						kind = quadlet.KindVolume
+						r.Get("/", h.ListVolumes)
+						r.Post("/", h.CreateVolume)
+					case "networks":
+						kind = quadlet.KindNetwork
+						r.Get("/", h.ListNetworks)
+						r.Post("/", h.CreateNetwork)
+					case "images":
+						kind = quadlet.KindImage
+						r.Get("/", h.ListImages)
+						r.Post("/", h.CreateImage)
+					}
 
-				r.Route("/{name}", func(r chi.Router) {
-					r.Get("/", h.readHandler(quadlet.KindContainer))
-					r.Get("/status", h.statusHandler(quadlet.KindContainer))
-					r.Post("/start", h.startHandler(quadlet.KindContainer))
-					r.Post("/stop", h.stopHandler(quadlet.KindContainer))
-					r.Post("/restart", h.restartHandler(quadlet.KindContainer))
-					r.Delete("/", h.deleteHandler(quadlet.KindContainer))
+					r.Route("/{name}", func(r chi.Router) {
+						r.Get("/", h.readHandler(kind))
+						r.Get("/status", h.statusHandler(kind))
+						r.Get("/stats", h.statsHandler(kind))
+						r.Post("/start", h.startHandler(kind))
+						r.Post("/stop", h.stopHandler(kind))
+						r.Post("/restart", h.restartHandler(kind))
+					})
 				})
-			})
-
-			r.Route("/volumes", func(r chi.Router) {
-				r.Get("/", h.ListVolumes)
-				r.Post("/", h.CreateVolume)
-
-				r.Route("/{name}", func(r chi.Router) {
-					r.Get("/", h.readHandler(quadlet.KindVolume))
-					r.Get("/status", h.statusHandler(quadlet.KindVolume))
-					r.Post("/start", h.startHandler(quadlet.KindVolume))
-					r.Post("/stop", h.stopHandler(quadlet.KindVolume))
-					r.Post("/restart", h.restartHandler(quadlet.KindVolume))
-					r.Delete("/", h.deleteHandler(quadlet.KindVolume))
-				})
-			})
-
-			r.Route("/networks", func(r chi.Router) {
-				r.Get("/", h.ListNetworks)
-				r.Post("/", h.CreateNetwork)
-
-				r.Route("/{name}", func(r chi.Router) {
-					r.Get("/", h.readHandler(quadlet.KindNetwork))
-					r.Get("/status", h.statusHandler(quadlet.KindNetwork))
-					r.Post("/start", h.startHandler(quadlet.KindNetwork))
-					r.Post("/stop", h.stopHandler(quadlet.KindNetwork))
-					r.Post("/restart", h.restartHandler(quadlet.KindNetwork))
-					r.Delete("/", h.deleteHandler(quadlet.KindNetwork))
-				})
-			})
-
-			r.Route("/images", func(r chi.Router) {
-				r.Get("/", h.ListImages)
-				r.Post("/", h.CreateImage)
-
-				r.Route("/{name}", func(r chi.Router) {
-					r.Get("/", h.readHandler(quadlet.KindImage))
-					r.Get("/status", h.statusHandler(quadlet.KindImage))
-					r.Post("/start", h.startHandler(quadlet.KindImage))
-					r.Post("/stop", h.stopHandler(quadlet.KindImage))
-					r.Post("/restart", h.restartHandler(quadlet.KindImage))
-					r.Delete("/", h.deleteHandler(quadlet.KindImage))
-				})
-			})
+			}
 		})
 	})
 }
 
 // POST/quadlet/containers?fail_if_exists=<bool>
 func (h *Quadlet) CreateContainer(w http.ResponseWriter, r *http.Request) {
-	h.createUnit(w, r, &quadlet.ContainerUnit{}, "quadlet.container.create")
+	h.createUnit(w, r, &quadlet.ContainerUnit{})
 }
 
 // POST/quadlet/volumes?fail_if_exists=<bool>
 func (h *Quadlet) CreateVolume(w http.ResponseWriter, r *http.Request) {
-	h.createUnit(w, r, &quadlet.VolumeUnit{}, "quadlet.volume.create")
+	h.createUnit(w, r, &quadlet.VolumeUnit{})
 }
 
 // POST/quadlet/networks?fail_if_exists=<bool>
 func (h *Quadlet) CreateNetwork(w http.ResponseWriter, r *http.Request) {
-	h.createUnit(w, r, &quadlet.NetworkUnit{}, "quadlet.network.create")
+	h.createUnit(w, r, &quadlet.NetworkUnit{})
 }
 
 // POST/quadlet/images?fail_if_exists=<bool>
 func (h *Quadlet) CreateImage(w http.ResponseWriter, r *http.Request) {
-	h.createUnit(w, r, &quadlet.ImageUnit{}, "quadlet.image.create")
+	h.createUnit(w, r, &quadlet.ImageUnit{})
 }
 
-func (h *Quadlet) createUnit(w http.ResponseWriter, r *http.Request, unit quadlet.Unit, action string) {
+func (h *Quadlet) createUnit(w http.ResponseWriter, r *http.Request, unit quadlet.Unit) {
 	ctx := apiutil.From(w, r)
+	action := "quadlet." + unit.Kind().String() + ".create"
 
 	if err := json.UnmarshalRead(r.Body, unit); err != nil {
 		apiutil.AuditFailure(ctx, r, action, err)
@@ -260,6 +239,21 @@ func (h *Quadlet) restartHandler(kind quadlet.Kind) http.HandlerFunc {
 	}
 }
 
+func (h *Quadlet) statsHandler(kind quadlet.Kind) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := apiutil.From(w, r)
+		name := chi.URLParam(r, "name")
+		stats, err := h.svc.Stats(r.Context(), kind, name)
+		if err != nil {
+			apiutil.AuditFailure(ctx, r, "quadlet.stats", err, slog.String("name", name), slog.String("kind", string(kind)))
+			writeQuadletError(ctx, err)
+			return
+		}
+		apiutil.AuditSuccess(ctx, r, "quadlet.stats", slog.String("name", name), slog.String("kind", string(kind)))
+		ctx.JSON(http.StatusOK, stats)
+	}
+}
+
 // --- List ---
 
 type unitInfoResponse struct {
@@ -271,31 +265,35 @@ type unitInfoResponse struct {
 }
 
 func (h *Quadlet) List(w http.ResponseWriter, r *http.Request) {
-	h.listByKind(w, r, nil, "quadlet.list")
+	h.listByKind(w, r, nil)
 }
 
 func (h *Quadlet) ListContainers(w http.ResponseWriter, r *http.Request) {
 	kind := quadlet.KindContainer
-	h.listByKind(w, r, &kind, "quadlet.container.list")
+	h.listByKind(w, r, &kind)
 }
 
 func (h *Quadlet) ListVolumes(w http.ResponseWriter, r *http.Request) {
 	kind := quadlet.KindVolume
-	h.listByKind(w, r, &kind, "quadlet.volume.list")
+	h.listByKind(w, r, &kind)
 }
 
 func (h *Quadlet) ListNetworks(w http.ResponseWriter, r *http.Request) {
 	kind := quadlet.KindNetwork
-	h.listByKind(w, r, &kind, "quadlet.network.list")
+	h.listByKind(w, r, &kind)
 }
 
 func (h *Quadlet) ListImages(w http.ResponseWriter, r *http.Request) {
 	kind := quadlet.KindImage
-	h.listByKind(w, r, &kind, "quadlet.image.list")
+	h.listByKind(w, r, &kind)
 }
 
-func (h *Quadlet) listByKind(w http.ResponseWriter, r *http.Request, kind *quadlet.Kind, action string) {
+func (h *Quadlet) listByKind(w http.ResponseWriter, r *http.Request, kind *quadlet.Kind) {
 	ctx := apiutil.From(w, r)
+	action := "quadlet.list"
+	if kind != nil {
+		action = fmt.Sprintf("quadlet.%s.list", kind)
+	}
 
 	entries, err := h.svc.List(r.Context())
 	if err != nil {

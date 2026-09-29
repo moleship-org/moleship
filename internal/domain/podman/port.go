@@ -28,7 +28,7 @@ type Port interface {
 	// Exists determinates if a container exists.
 	Exists(ctx context.Context, name string) (bool, error)
 
-	// Stats returns a live stream of a container's resource usage.
+	// Stats returns a container's resource usage.
 	Stats(ctx context.Context, name string) (*entities.ContainerStatReport, error)
 
 	// Logs returns a stream of logs.

@@ -4,19 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/url"
 
+	"github.com/containers/podman/v5/pkg/domain/entities"
+	"github.com/moleship-org/moleship/internal/domain/podman"
 	"github.com/moleship-org/moleship/internal/domain/systemd"
 )
 
 type QuadletService struct {
 	files   FSPort
 	systemd systemd.Port
+	podman  podman.Port
 }
 
-func New(files FSPort, sys systemd.Port) *QuadletService {
+func New(files FSPort, sys systemd.Port, pod podman.Port) *QuadletService {
 	return &QuadletService{
 		files:   files,
 		systemd: sys,
+		podman:  pod,
 	}
 }
 
@@ -144,4 +150,22 @@ func (s *QuadletService) List(ctx context.Context) ([]UnitInfo, error) {
 	}
 
 	return result, nil
+}
+
+func (s *QuadletService) Stats(ctx context.Context, kind Kind, name string) (*entities.ContainerStatReport, error) {
+	if err := validateName(name); err != nil {
+		return nil, err
+	}
+	serviceName := name + kind.ServiceSuffix()
+
+	return s.podman.Stats(ctx, serviceName)
+}
+
+func (s *QuadletService) Logs(ctx context.Context, kind Kind, name string, opts url.Values) (io.ReadCloser, error) {
+	if err := validateName(name); err != nil {
+		return nil, err
+	}
+	serviceName := name + kind.ServiceSuffix()
+
+	return s.podman.Logs(ctx, serviceName, opts)
 }
