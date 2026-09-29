@@ -55,6 +55,7 @@ func (h *Quadlet) Mount(r chi.Router) {
 
 					r.Route("/{name}", func(r chi.Router) {
 						r.Get("/", h.readHandler(kind))
+						r.Delete("/", h.deleteHandler(kind))
 						r.Get("/status", h.statusHandler(kind))
 						r.Get("/stats", h.statsHandler(kind))
 						r.Post("/start", h.startHandler(kind))
